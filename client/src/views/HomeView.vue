@@ -7,7 +7,7 @@ async function fetchData() {
     try {
         message.value = 'Conectando...';
         
-        const response = await fetch('http://localhost:3000/api/test');
+        const response = await fetch('http://192.168.1.106:3000/api/test');
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
