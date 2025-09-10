@@ -9,6 +9,7 @@ import PrimeVue from 'primevue/config';
 //components
 import Card from 'primevue/card';
 import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
 
 //temas
 import Aura from '@primeuix/themes/aura';
@@ -20,6 +21,7 @@ app.use(router);
 
 app.component('Card', Card);
 app.component('Button', Button)
+app.component('InputText', InputText)
 
 app.use(PrimeVue, {
     theme: {

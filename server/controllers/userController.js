@@ -61,7 +61,7 @@ export async function loginUser(req, res) {
         return res.status(200).json({
             id: userExist.id,
             name: userExist.name,
-            email: userExist.email,
+            email: userExist.email
             // token
         })
 
