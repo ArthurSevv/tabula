@@ -33,6 +33,8 @@ export async function login(credentials) {
     return handleResponse(response);
 }
 
+//FUNCOES DO WALL
+
 export async function getUserWalls() {
     const userData = JSON.parse(localStorage.getItem('userData'));
     const token = userData ? userData.token : null;
@@ -48,5 +50,21 @@ export async function getUserWalls() {
         }
     });
 
+    return handleResponse(response);
+}
+
+export async function createWall(wallData) {
+    const userData = JSON.parse(localStorage.getItem('userData')); 
+    const token = userData ? userData.token : null;
+    if (!token) throw new Error("Token de autenticação não encontrado.");
+
+    const response = await fetch(WALLS_API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(wallData)
+    })
     return handleResponse(response);
 }

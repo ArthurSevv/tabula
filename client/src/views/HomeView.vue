@@ -1,25 +1,47 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import { getUserWalls } from '@/services/api';
+import { getUserWalls, createWall } from '@/services/api';
 import { useRouter } from 'vue-router';
 
-const router = useRouter();
+import ProgressSpinner from 'primevue/progressspinner';
+import Dialog from 'primevue/dialog';
+import Card from 'primevue/card';
+import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
 
+const router = useRouter();
 const walls = ref([]);
 const isLoading = ref(true);
 const error = ref(null);
 
+//pop up
+const isDialogVisible = ref(false);
+const newWallTitle = ref('');
+
 onMounted(async () => {
     try {
-        const userWalls = await getUserWalls();
-        walls.value = userWalls;
+        walls.value = await getUserWalls();
     } catch (error) {
-        console.error("Erro ao buscar murais:", err);
-        error.value = "Não foi possível carregar seus murais"
+        error.value = "Não foi possível carregar seus murais";
     } finally {
         isLoading.value = false;
     }
 });
+
+async function handleCreateWall() {
+  if (!newWallTitle.value.trim()) {
+    alert("O título não pode estar vazio.")
+    return;
+  }
+  try {
+    const newWall = await createWall({ title: newWallTitle.value });
+    walls.value.push(newWall);
+    isDialogVisible.value = false;
+    newWallTitle.value = '';
+  } catch (err) {
+    alert("Não foi possível criar o mural.")
+  }
+}
 
 function openWall(wallId) {
     console.log(`Abrindo Mural com ID: ${wallId}`);
@@ -31,14 +53,12 @@ function openWall(wallId) {
   <div class="home-container">
     <div class="header">
       <h1>Meus Murais</h1>
-      <Button label="Criar Novo Mural" icon="pi pi-plus" />
+      <Button label="Criar Novo Mural" icon="pi pi-plus" @click="isDialogVisible = true" />
     </div>
 
     <div v-if="isLoading" class="loading-container">
       <ProgressSpinner />
-      <p>Carregando seus murais...</p>
     </div>
-
     <div v-else-if="error" class="error-message">
       <p>{{ error }}</p>
     </div>
@@ -58,6 +78,19 @@ function openWall(wallId) {
       <h2>Nenhum mural encontrado!</h2>
       <p>Você ainda não tem nenhum mural. Que tal criar o primeiro?</p>
     </div>
+
+    <Dialog v-model:visible="isDialogVisible" modal header="Criar Novo Mural" :style="{ width: '25rem' }">
+        <div class="form-group">
+            <label for="wall-title">Título do Mural</label>
+            <InputText id="wall-title" v-model="newWallTitle" class="w-full" @keyup.enter="handleCreateWall" />
+        </div>
+        
+        <template #footer>
+            <Button label="Cancelar" severity="secondary" @click="isDialogVisible = false" />
+            <Button label="Salvar" @click="handleCreateWall" />
+        </template>
+    </Dialog>
+
   </div>
 </template>
 
@@ -98,6 +131,17 @@ function openWall(wallId) {
 .wall-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+
+.form-group { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 0.5rem; 
+  padding-top: 1rem; 
+}
+
+.w-full { 
+  width: 100%; 
 }
 
 .error-message {
