@@ -30,6 +30,9 @@ export async function getWallById(req, res) {
         const userId = req.user.id;
         const wall = await prisma.wall.findUnique({
             where: { id: wallId },
+            include: { 
+                notes: true 
+            },
         });
 
         if (!wall) {

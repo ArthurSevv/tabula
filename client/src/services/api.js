@@ -68,3 +68,17 @@ export async function createWall(wallData) {
     })
     return handleResponse(response);
 }
+
+export async function getWallById(wallId) {
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    const token = userData ? userData.token : null;
+    if (!token) throw new Error("Token de autenticação não encontrado.");
+
+    const response = await fetch(`${WALLS_API_URL}/${wallId}`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+    return handleResponse(response);
+}

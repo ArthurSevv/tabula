@@ -44,7 +44,7 @@ async function handleCreateWall() {
 }
 
 function openWall(wallId) {
-    console.log(`Abrindo Mural com ID: ${wallId}`);
+  router.push(`/map/${wallId}`);
 }
 
 </script>
