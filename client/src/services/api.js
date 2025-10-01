@@ -1,4 +1,5 @@
 const API_URL = "http://localhost:3000/api/users";
+const WALLS_API_URL = "http://localhost:3000/api/walls";
 
 async function handleResponse(response) {
     const data = await response.json();
@@ -29,5 +30,23 @@ export async function login(credentials) {
         },
         body: JSON.stringify(credentials),
     });
+    return handleResponse(response);
+}
+
+export async function getUserWalls() {
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    const token = userData ? userData.token : null;
+
+    if (!token) {
+        throw new Error("Token de autenticaçao não encontrado.")
+    }
+
+    const response = await fetch(WALLS_API_URL, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
     return handleResponse(response);
 }
