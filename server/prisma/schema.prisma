@@ -14,34 +14,53 @@ datasource db {
 }
 
 model User {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  name            String
-  email           String   @unique
-  hashedPassword  String
-  walls           Wall[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  name              String
+  email             String   @unique
+  hashedPassword    String
+  walls             Wall[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Wall {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  title           String
-  shareLink       String   @unique
-  createdAt       DateTime @default(now())
-  ownerId         String   @db.ObjectId
-  owner           User     @relation(fields: [ownerId], references: [id])
-  notes           Note[]
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  title             String
+  shareLink         String?   
+  createdAt         DateTime @default(now())
+  ownerId           String   @db.ObjectId
+  owner             User     @relation(fields: [ownerId], references: [id])
+  notes             Note[]
+}
+
+model NoteConnections {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  sourceNoteId      String   @db.ObjectId
+  targetNoteId      String   @db.ObjectId
+
+  sourceNote        Note     @relation("sourceConnections", fields: [sourceNoteId], references: [id])
+  targetNote        Note     @relation("targetConnections", fields: [targetNoteId], references: [id])
 }
 
 model Note {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  type            NoteType
-  textContent     String?
-  imageUrl        String?
-  linkUrl         String?
-  createdAt       DateTime @default(now())
-  wallId          String   @db.ObjectId
-  wall            Wall     @relation(fields: [wallId], references: [id])
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  type              NoteType
+  textContent       String?
+  imageUrl          String?
+  linkUrl           String?
+  videoUrl          String?
+  pdfUrl            String?
+  createdAt         DateTime @default(now())
+
+  wallId            String   @db.ObjectId
+  wall              Wall     @relation(fields: [wallId], references: [id])
+
+  //1 - *
+  sourceConnection  NoteConnections[] @relation("sourceConnections")
+
+  //1 - *
+  targetConnections NoteConnections[] @relation("targetConnections")
 }
 
 //enumerations
@@ -50,4 +69,6 @@ enum NoteType {
   TEXT
   IMAGE
   LINK
+  VIDEO
+  PDF
 }

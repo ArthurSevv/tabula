@@ -33,6 +33,10 @@
                         <InputText type="password" id="confPassword" v-model="confPassword" />
                     </div>
 
+                    <div v-if="errorMessage" class="error-message">
+                        {{ errorMessage }}
+                    </div>
+
                 </div>
             </template>
 
@@ -61,30 +65,46 @@
 <script setup>
 import { ref } from 'vue';
 import { register, login } from '@/services/api';
+import { useRouter } from 'vue-router';
 
 //controla o tipo de formulario, por padrao tela de login
-const isLoginMode = ref(true)
+const router = useRouter();
+const isLoginMode = ref(true);
 
 const name = ref('');
 const email = ref('');
 const password = ref('');
 const confPassword = ref('');
+const errorMessage = ref('');
 
 function toggleMode(){
     isLoginMode.value = !isLoginMode.value;
+    errorMessage.value = '';
 }
 
 async function handleSubmit() {
+    errorMessage.value = '';
+
+    if (!isLoginMode.value && password.value !== confPassword.value) {
+        errorMessage.value = "As senhas não coincidem.";
+        return;
+    }
+
     try{
+        let response;
         if (isLoginMode.value) {
-            console.log('logado')
-            return await login({ email: email.value, password: password.value });
+            response = await login({ email: email.value, password: password.value });
         } else {
-            console.log('cadastrado')
-            return await register({ name: name.value, email: email.value, password: password.value });
+            response = await register({ name: name.value, email: email.value, password: password.value });
         }
+        
+        //se tiver sucesso
+        localStorage.setItem('userData', JSON.stringify(response));
+        router.push('/');
+
     } catch (error) {
-        console.error('email ou senha invalidos')
+        console.error('Falha na autenticação:', error.message);
+        errorMessage.value = error.message;
     }
 }
 

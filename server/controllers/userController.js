@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import generateToken from '../utils/generateToken.js';
 
 const prisma = new PrismaClient();
 
@@ -29,7 +30,8 @@ export async function registerUser(req, res) {
         return res.status(201).json({ 
             id: user.id,
             name: user.name,
-            email: user.email
+            email: user.email,
+            token: generateToken(user.id)
         })
         
     } catch (error) {
@@ -61,8 +63,8 @@ export async function loginUser(req, res) {
         return res.status(200).json({
             id: userExist.id,
             name: userExist.name,
-            email: userExist.email
-            // token
+            email: userExist.email,
+            token: generateToken(userExist.id)
         })
 
     } catch (error) {
