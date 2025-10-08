@@ -1,6 +1,7 @@
 const API_URL = "http://localhost:3000/api/users";
 const WALLS_API_URL = "http://localhost:3000/api/walls";
 const NOTES_API_URL = "http://localhost:3000/api/notes";
+const EDGES_API_URL = "http://localhost:3000/api/edges";
 
 async function handleResponse(response) {
     const data = await response.json();
@@ -132,6 +133,25 @@ export async function updateNotePosition(noteId, position) {
             'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ position })
+    });
+    return handleResponse(response);
+}
+
+//------------------------------------------------------------
+//edges
+
+export async function createEdge(edgeData) {
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    const token = userData ? userData.token : null;
+    if (!token) throw new Error("Token de autenticaçao não encontrado.");
+
+    const response = await fetch(EDGES_API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(edgeData)
     });
     return handleResponse(response);
 }

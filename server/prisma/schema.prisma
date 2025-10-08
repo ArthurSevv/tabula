@@ -30,7 +30,9 @@ model Wall {
   createdAt         DateTime @default(now())
   ownerId           String   @db.ObjectId
   owner             User     @relation(fields: [ownerId], references: [id])
+  
   notes             Note[]
+  edges             Edge[]
 }
 
 model NoteConnections {
@@ -64,6 +66,17 @@ model Note {
 
   //1 - *
   targetConnections NoteConnections[] @relation("targetConnections")
+}
+
+model Edge {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  sourceId          String
+  targetId          String
+
+  wallId            String   @db.ObjectId
+  wall              Wall     @relation(fields: [wallId], references: [id])
+
+  createAt          DateTime @default(now())
 }
 
 //enumerations

@@ -1,13 +1,16 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { Background } from '@vue-flow/background';
 import { VueFlow, useVueFlow } from '@vue-flow/core';
-import { getWallById, createNote, updateNote, updateNotePosition } from '@/services/api';
+import { ControlButton, Controls } from '@vue-flow/controls';
+import { getWallById, createNote, updateNote, updateNotePosition, createEdge } from '@/services/api';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import Textarea from 'primevue/textarea';
 
 const route = useRoute();
+const { onConnect, addEdges } = useVueFlow();
 
 const elements = ref([]);
 const isLoading = ref(true);
@@ -31,10 +34,15 @@ onMounted(async () => {
                 position: hasSavedPosition
                     ? { x: note.positionX, y: note.positionY }
                     : { x: (index * 250) % 1000, y: Math.floor(index / 4) * 120 },
+                type: 'default',
             };
         });
 
-        const edges = [];
+        const edges = wallData.edges.map(edge => ({
+            id: `e${edge.sourceId}-${edge.targetId}`,
+            source: edge.sourceId,
+            target: edge.targetId,
+        }));
         elements.value = [...nodes, ...edges];
 
     } catch (error) {
@@ -43,6 +51,21 @@ onMounted(async () => {
     } finally {
         isLoading.value = false;
     }
+});
+
+onConnect((params) => {
+    const wallId = route.params.id;
+    const newEdgeData = {
+        sourceId: params.source,
+        targetId: params.target,
+        wallId: wallId,
+    }
+    addEdges([params]);
+
+    createEdge(newEdgeData).catch(error => {
+        console.error("Erro ao salvar a conexão:", error);
+        alert("Não foi possível salvar a conexão.");
+    });
 });
 
 //add nota
@@ -60,8 +83,8 @@ async function handleAddNewNote() {
         const newNode ={
             id: newNoteFromApi.id,
             label: newNoteFromApi.textContent,
-            //pos test REVER====================
-            position: { x: 100, y:100}
+            position: { x: 100, y:100},
+            type: 'default',
         };
 
         elements.value.push(newNode);
@@ -119,13 +142,26 @@ async function handleUpdateNote() {
     <div class="map-container">
         <div v-if="isLoading">Carregando mapa...</div>
         <div v-else-if="error">{{ error }}</div>
-        <VueFlow v-else v-model="elements" @node-double-click="openEditDialog" @node-drag-stop="onNodeDragStop" fit-view-on-init>
-            <div class="controls">
-                <Button icon="pi pi-plus" @click="handleAddNewNote" />
+        <VueFlow 
+            v-else 
+            v-model="elements" 
+            @node-double-click="openEditDialog" 
+            @node-drag-stop="onNodeDragStop" 
+            fit-view-on-init
+        >
+            <Background />
+            <Controls />
+
+            <div class="controls-custom">
+                <Button icon="pi pi-plus" @click="handleAddNewNote" title="Adicionar Nota" />
             </div>
         </VueFlow>
 
-        <Dialog v-model:visible="isEditDialogVisible" modal header="Editar Nota" :style="{ width: '30rem' }">
+        <Dialog 
+            v-model:visible="isEditDialogVisible" 
+            modal header="Editar Nota" 
+            :style="{ width: '30rem' }"
+        >
             <div class="form-group">
                 <Textarea v-model="editingText" rows="5" class="w-full" />
             </div>
@@ -148,8 +184,10 @@ async function handleUpdateNote() {
     position: relative;
 }
 
-.controls {
+.controls-custom {
     position: absolute;
+    top: 15px;
+    right: 15px;
     z-index: 10;
 }
 
