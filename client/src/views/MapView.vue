@@ -4,13 +4,13 @@ import { useRoute } from 'vue-router';
 import { Background } from '@vue-flow/background';
 import { VueFlow, useVueFlow } from '@vue-flow/core';
 import { ControlButton, Controls } from '@vue-flow/controls';
-import { getWallById, createNote, updateNote, updateNotePosition, createEdge } from '@/services/api';
+import { getWallById, createNote, updateNote, updateNotePosition, deleteNote, createEdge, deleteEdge } from '@/services/api';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import Textarea from 'primevue/textarea';
 
 const route = useRoute();
-const { onConnect, addEdges } = useVueFlow();
+const { onConnect, addEdges, onNodesChange, onEdgesChange } = useVueFlow();
 
 const elements = ref([]);
 const isLoading = ref(true);
@@ -65,6 +65,26 @@ onConnect((params) => {
     createEdge(newEdgeData).catch(error => {
         console.error("Erro ao salvar a conexão:", error);
         alert("Não foi possível salvar a conexão.");
+    });
+});
+//deleta nota
+onNodesChange((changes) => {
+    changes.forEach(change => {
+        if (change.type === 'remove') {
+            console.log('Nó removido:', change.id);
+            deleteNote(change.id).catch(error => {
+                console.error("Erro ao deletar a nota na API:", error);
+            });
+        }
+    });
+});
+//deleta conexao
+onEdgesChange((changes) => {
+    changes.forEach(change => {
+        if (change.type === 'remove') {
+            console.log('Aresta removido:', change.id);
+            //deletar arestas no futuro
+        }
     });
 });
 

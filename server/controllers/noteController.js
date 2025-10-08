@@ -90,3 +90,38 @@ export async function updateNotePosition(req, res) {
         res.status(500).json({ message: "Erro ao atualizar a posição da nota." });
     }
 }
+
+export async function deleteNote(req, res) {
+    const { id: noteId } = req.params;
+    const userId = req.user.id;
+
+    try {
+        const note = await prisma.note.findUnique({
+            where: { id: noteId },
+            include: { wall: true }
+        });
+
+        if (!note || note.wall.ownerId !== userId) {
+            return res.status(403).json({ message: "Acesso negado." });
+        }
+
+        await prisma.$transaction([
+            prisma.edge.deleteMany({
+                where: {
+                    OR: [
+                        { sourceId: noteId },
+                        { targetId: noteId },
+                    ]
+                }
+            }),
+            prisma.note.delete({
+                where: { id: noteId }
+            })
+        ]);
+
+        return res.status(204).send();
+    } catch (error) {
+        console.error("ERRO AO DELETAR NOTA:", error);
+        return res.status(500).json({ message: "Erro ao deletar a nota." });
+    }
+}

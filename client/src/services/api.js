@@ -137,6 +137,25 @@ export async function updateNotePosition(noteId, position) {
     return handleResponse(response);
 }
 
+export async function deleteNote(noteId) {
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    const token = userData ? userData.token : null;
+    if (!token) throw new Error("Token de autenticaçao não encontrado.");
+
+    const response = await fetch(`${NOTES_API_URL}/${noteId}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
+    });
+
+    if (!response.ok) {
+        const errorData = { message: `Erro ao deletar a nota.` };
+        throw new Error(errorData.message);
+    }
+    return true;
+}
+
 //------------------------------------------------------------
 //edges
 
@@ -154,4 +173,24 @@ export async function createEdge(edgeData) {
         body: JSON.stringify(edgeData)
     });
     return handleResponse(response);
+}
+
+export async function deleteEdge(edgeId) {
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    const token = userData ? userData.token : null;
+    if (!token) throw new Error("Token de autenticaçao não encontrado.");
+
+    const response = await fetch(`${EDGES_API_URL}/${edgeId}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(edgeData)
+    });
+
+    if (!response.ok) {
+        const errorData = { message: `Erro ao deletar a conexão.` };
+        throw new Error(errorData.message);
+    }
+    return true;
 }
