@@ -27,3 +27,33 @@ export async function createNote(req, res) {
         res.status(500).json({ message: "Erro ao criar a nota." });
     }
 }
+
+export async function updateNotePosition(req, res) {
+    const { id } = req.params;
+    const { position } = req.body;
+    const userId = req.user.id;
+
+    try {
+        const note = await prisma.note.findUnique({
+            where: { id },
+            include: { wall: true }
+        });
+
+        if(!note || note.wall.ownerId !== userId) {
+            return res.status(403).json({ message: "Acesso negado." });
+        }
+
+        const updatedNote = await prisma.note.update({
+            where: { id: id },
+            data: {
+                positionX: position.x,
+                positionY: position.y,
+            }
+        });
+
+        res.status(200).json(updatedNote);
+    } catch (error) {
+        console.error("Erro atualizar posicao", error);
+        res.status(500).json({ message: "Erro ao atualizar a posição da nota." });
+    }
+}

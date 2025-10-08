@@ -53,6 +53,9 @@ model Note {
   pdfUrl            String?
   createdAt         DateTime @default(now())
 
+  positionX         Float?
+  positionY         Float?
+
   wallId            String   @db.ObjectId
   wall              Wall     @relation(fields: [wallId], references: [id])
 

@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { VueFlow, useVueFlow } from '@vue-flow/core';
-import { getWallById, createNote } from '@/services/api';
+import { getWallById, createNote, updateNotePosition } from '@/services/api';
 import { Button } from 'primevue';
 
 const elements = ref([]);
@@ -16,11 +16,17 @@ onMounted(async () => {
         const wallId = route.params.id;
         const wallData = await getWallById(wallId);
 
-        const nodes = wallData.notes.map((note, index) => ({
-            id: note.id,
-            label: note.textContent || 'Nota sem texto',
-            position: { x: (index * 200) %800, y: Math.floor(index / 4) * 150 }
-        }));
+        const nodes = wallData.notes.map((note, index) => {
+            const hasSavedPosition = note.positionX !== null && note.positionY !== null;
+            
+            return {
+                id: note.id,
+                label: note.textContent || 'Nota sem texto',
+                position: hasSavedPosition
+                    ? { x: note.positionX, y: note.positionY }
+                    : { x: (index * 250) % 1000, y: Math.floor(index / 4) * 120 },
+            };
+        });
 
         const edges = [];
         elements.value = [...nodes, ...edges];
@@ -57,13 +63,26 @@ async function handleAddNewNote() {
     }
 }
 
+function onNodeDragStop(event) {
+    const { node } = event;
+
+    if (node.position.x !== node.oldPosition?.x || node.position.y !== node.oldPosition?.y) {
+        console.log(`Nota ${node.id} movida para`, node.position);
+
+        //chama api
+        updateNotePosition(node.id, node.position).catch(err => {
+            console.error("Falha salvar nova position:", err);
+        });
+    }
+}
+
 </script>
 
 <template>
     <div style="height: 100vh; width: 100vw;">
         <div v-if="isLoading">Carregando mapa...</div>
         <div v-else-if="error">{{ error }}</div>
-        <VueFlow v-else v-model="elements" fit-view-on-init>
+        <VueFlow v-else v-model="elements" @node-drag-stop="onNodeDragStop" fit-view-on-init>
             <div class="controls">
                 <button icon="pi pi-plus" @click="handleAddNewNote" />
             </div>
