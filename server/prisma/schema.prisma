@@ -45,7 +45,7 @@ model NoteConnections {
 
 model Note {
   id                String   @id @default(auto()) @map("_id") @db.ObjectId
-  type              NoteType
+  type              NoteType @default(TEXT)
   textContent       String?
   imageUrl          String?
   linkUrl           String?

@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import userRoutes from './routes/userRoutes.js';
 import wallRoutes from './routes/wallRoutes.js';
+import noteRoutes from './routes/noteRoutes.js';
 
 dotenv.config(); 
 const app = express();
@@ -13,6 +14,7 @@ app.use(cors());
 
 app.use('/api/users', userRoutes);
 app.use('/api/walls', wallRoutes);
+app.use('/api/notes', noteRoutes);
 
 app.get('/', (req, res) => {
     res.send('Servidor funcionando');
