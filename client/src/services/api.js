@@ -104,6 +104,22 @@ export async function createNote(noteData) {
     return handleResponse(response);
 }
 
+export async function updateNote(noteId, noteData) {
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    const token = userData ? userData.token : null;
+    if (!token) throw new Error("Token de autenticaçao não encontrado.");
+
+    const response = await fetch(`${NOTES_API_URL}/${noteId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(noteData)
+    });
+    return handleResponse(response);
+}
+
 export async function updateNotePosition(noteId, position) {
     const userData = JSON.parse(localStorage.getItem('userData'));
     const token = userData ? userData.token : null;

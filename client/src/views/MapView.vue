@@ -2,14 +2,20 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { VueFlow, useVueFlow } from '@vue-flow/core';
-import { getWallById, createNote, updateNotePosition } from '@/services/api';
-import { Button } from 'primevue';
+import { getWallById, createNote, updateNote, updateNotePosition } from '@/services/api';
+import Button from 'primevue/button';
+import Dialog from 'primevue/dialog';
+import Textarea from 'primevue/textarea';
+
+const route = useRoute();
 
 const elements = ref([]);
 const isLoading = ref(true);
 const error = ref(null);
 
-const route = useRoute();
+const isEditDialogVisible = ref(false);
+const editingNote = ref(null);
+const editingText = ref('');
 
 onMounted(async () => {
     try {
@@ -39,6 +45,8 @@ onMounted(async () => {
     }
 });
 
+//add nota
+
 async function handleAddNewNote() {
     try {
         const wallId = route.params.id;
@@ -67,8 +75,6 @@ function onNodeDragStop(event) {
     const { node } = event;
 
     if (node.position.x !== node.oldPosition?.x || node.position.y !== node.oldPosition?.y) {
-        console.log(`Nota ${node.id} movida para`, node.position);
-
         //chama api
         updateNotePosition(node.id, node.position).catch(err => {
             console.error("Falha salvar nova position:", err);
@@ -76,17 +82,59 @@ function onNodeDragStop(event) {
     }
 }
 
+//edita nota
+
+function openEditDialog({ node }) {
+    editingNote.value = node;
+    editingText.value = node.label;
+    isEditDialogVisible.value = true;
+}
+
+async function handleUpdateNote() {
+    if (!editingNote.value) return;
+
+    const noteId = editingNote.value.id;
+    const newText = editingText.value;
+
+    try {
+        await updateNote(noteId, { textContent: newText });
+
+        const nodeInElements = elements.value.find(el => el.id === noteId);
+        if (nodeInElements) {
+            nodeInElements.label = newText;
+        }
+
+        isEditDialogVisible.value = false;
+        editingNote.value = null;
+        editingText.value = '';
+    } catch (error) {
+        console.error("Erro ao atualizar a nota:", error);
+        alert("Não foi possível salvar as alterações.")
+    }
+}
+
 </script>
 
 <template>
-    <div style="height: 100vh; width: 100vw;">
+    <div class="map-container">
         <div v-if="isLoading">Carregando mapa...</div>
         <div v-else-if="error">{{ error }}</div>
-        <VueFlow v-else v-model="elements" @node-drag-stop="onNodeDragStop" fit-view-on-init>
+        <VueFlow v-else v-model="elements" @node-double-click="openEditDialog" @node-drag-stop="onNodeDragStop" fit-view-on-init>
             <div class="controls">
-                <button icon="pi pi-plus" @click="handleAddNewNote" />
+                <Button icon="pi pi-plus" @click="handleAddNewNote" />
             </div>
         </VueFlow>
+
+        <Dialog v-model:visible="isEditDialogVisible" modal header="Editar Nota" :style="{ width: '30rem' }">
+            <div class="form-group">
+                <Textarea v-model="editingText" rows="5" class="w-full" />
+            </div>
+
+            <template #footer>
+                <Button label="Cancelar" severity="secondary" @click="isEditDialogVisible = false" />
+                <Button label="Salvar" @click="handleUpdateNote" />
+            </template>
+        </Dialog>
     </div>
 </template>
 
@@ -103,5 +151,16 @@ function onNodeDragStop(event) {
 .controls {
     position: absolute;
     z-index: 10;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-top: 1rem;
+}
+
+.w-full{
+    width: 100%;
 }
 </style>
