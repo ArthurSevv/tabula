@@ -86,6 +86,24 @@ export async function getWallById(wallId) {
     return handleResponse(response);
 }
 
+export async function deleteWall(wallId) {
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    const token = userData ? userData.token : null;
+    if (!token) throw new Error("Token de autenticaçao não encontrado.");
+
+    const response = await fetch(`${WALLS_API_URL}/${wallId}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error('Erro ao deletar o mural.');
+    }
+    return true;
+}
+
 //------------------------------------------------------------------
 //FUNCOES DAS NOTES
 

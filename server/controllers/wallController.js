@@ -62,3 +62,40 @@ export async function getUserWalls(req, res) {
         res.status(500).json({ message: "Erro ao buscar os murais." });
     }
 }
+
+export async function deleteWall(req, res) {
+    const { id: wallId } = req.params;
+    const userId = req.user.id;
+
+    try {
+        const wall = await prisma.wall.findUnique({
+            where: { id: wallId },
+        });
+
+        if (!wall) {
+            return res.status(404).json({ message: "Mural não encontrado." });
+        }
+        if (wall.ownerId !== userId) {
+            return res.status(403).json({ message: "Acesso negado."});
+        }
+
+        await prisma.$transaction([
+            //deleta arestas do mural
+            prisma.edge.deleteMany({
+                where: { wallId: wallId },
+            }),
+            //deleta notas do mural
+            prisma.note.deleteMany({
+                where: { wallId: wallId },
+            }),
+            //deleta o mural
+            prisma.wall.delete({
+                where: { id: wallId },
+            }),
+        ]);
+        return res.status(204).send();
+    } catch (error) {
+        console.error("ERRO AO DELETAR MURAL:", error);
+        return res.status(500).json({ message: "Erro ao deletar o mural." });
+    }
+}

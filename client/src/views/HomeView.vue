@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import { getUserWalls, createWall } from '@/services/api';
+import { getUserWalls, createWall, deleteWall } from '@/services/api';
+import { useConfirm } from "primevue/useconfirm";
 import { useRouter } from 'vue-router';
 
 import ProgressSpinner from 'primevue/progressspinner';
@@ -8,7 +9,9 @@ import Dialog from 'primevue/dialog';
 import Card from 'primevue/card';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
+import { ConfirmDialog } from 'primevue';
 
+const confirm = useConfirm();
 const router = useRouter();
 const walls = ref([]);
 const isLoading = ref(true);
@@ -27,6 +30,11 @@ onMounted(async () => {
         isLoading.value = false;
     }
 });
+
+function handleLogout() {
+  localStorage.removeItem('userData');
+  router.push('/auth')
+}
 
 async function handleCreateWall() {
   if (!newWallTitle.value.trim()) {
@@ -47,14 +55,52 @@ function openWall(wallId) {
   router.push(`/map/${wallId}`);
 }
 
+function handleDeleteWall(wallId) {
+  confirm.require({
+    message: 'Você tem certeza que quer deletar este mural? Todas as notas e conexões serão perdidas permanentemente.',
+    header: 'Confirmação de Deleção',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'Sim, deletar',
+    rejectLabel: 'Cancelar',
+    accept: async () => {
+      try {
+        await deleteWall(wallId);
+        walls.value = walls.value.filter(wall => wall.id !== wallId);
+        //deixar bnito
+      } catch (error) {
+        console.error("Erro ao deletar mural:", err);
+        alert("Não foi possível deletar o mural.");
+      }
+    }
+  });
+}
+
 </script>
 
 <template>
   <div class="home-container">
+    <ConfirmDialog />
+
     <div class="header">
       <h1>Meus Murais</h1>
-      <Button label="Criar Novo Mural" icon="pi pi-plus" @click="isDialogVisible = true" />
-    </div>
+
+      <div class="header-actions">
+        <Button 
+          label="Criar Novo Mural" 
+          icon="pi pi-plus" 
+          @click="isDialogVisible = true" 
+        />
+        <Button
+          icon="pi pi-sign-out"
+          severity="secondary"
+          text
+          rounded
+          @click="handleLogout"
+          aria-label="Sair"
+          v-tooltip.bottom="'Sair'"
+        />
+        </div>
+      </div>
 
     <div v-if="isLoading" class="loading-container">
       <ProgressSpinner />
@@ -64,19 +110,32 @@ function openWall(wallId) {
     </div>
 
     <div v-else-if="walls.length > 0" class="walls-grid">
-      <Card v-for="wall in walls" :key="wall.id" class="wall-card" @click="openWall(wall.id)">
+      <Card v-for="wall in walls" :key="wall.id" class="wall-card">
         <template #title>
-          {{ wall.title }}
+          <div class="card-title">
+            <span>{{ wall.title }}</span>
+            <button 
+              icon="pi pi-trash"
+              severity="danger"
+              text
+              rounded
+              @click.stop="handleDeleteWall(wall.id)"
+              aria-label="Deletar Mural"
+              v-tooltip.bottom="'Deletar Mural'"
+            />
+          </div>
         </template>
         <template #content>
-          <p>Criado em: {{ new Date(wall.createdAt).toLocaleDateString() }}</p>
+          <div @click="openWall(wall.id)" class="card-content">
+            <p>Criado em: {{ new Date(wall.createdAt).toLocaleDateString() }}</p>
+          </div>
         </template>
       </Card>
     </div>
 
     <div v-else class="empty-state">
       <h2>Nenhum mural encontrado!</h2>
-      <p>Você ainda não tem nenhum mural. Que tal criar o primeiro?</p>
+      <p>Você ainda não tem nenhum mural. Crie o seu primeiro!</p>
     </div>
 
     <Dialog v-model:visible="isDialogVisible" modal header="Criar Novo Mural" :style="{ width: '25rem' }">
@@ -84,13 +143,11 @@ function openWall(wallId) {
             <label for="wall-title">Título do Mural</label>
             <InputText id="wall-title" v-model="newWallTitle" class="w-full" @keyup.enter="handleCreateWall" />
         </div>
-        
         <template #footer>
             <Button label="Cancelar" severity="secondary" @click="isDialogVisible = false" />
             <Button label="Salvar" @click="handleCreateWall" />
         </template>
     </Dialog>
-
   </div>
 </template>
 
@@ -106,6 +163,12 @@ function openWall(wallId) {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
+}
+
+.header-action {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .loading-container, .empty-state {
@@ -150,5 +213,15 @@ function openWall(wallId) {
   padding: 1rem;
   border-radius: 8px;
   text-align: center;
+}
+
+.card-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-content {
+  cursor: pointer;
 }
 </style>

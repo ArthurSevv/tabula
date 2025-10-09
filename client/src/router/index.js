@@ -24,4 +24,20 @@ const router = createRouter({
   ],
 })
 
+router.beforeEach((to, from, next) => {
+  const publicPages = ['/auth']
+  const authRequired = !publicPages.includes(to.path);
+  const loggedIn = localStorage.getItem('userData');
+
+  if (authRequired && !loggedIn) {
+    return next('/auth');
+  }
+
+  if (!authRequired && loggedIn) {
+    return next('/');
+  }
+
+  next();
+});
+
 export default router
