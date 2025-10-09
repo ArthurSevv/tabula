@@ -1,16 +1,20 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, markRaw } from 'vue';
 import { useRoute } from 'vue-router';
 import { Background } from '@vue-flow/background';
 import { VueFlow, useVueFlow } from '@vue-flow/core';
 import { ControlButton, Controls } from '@vue-flow/controls';
 import { getWallById, createNote, updateNote, updateNotePosition, deleteNote, createEdge, deleteEdge } from '@/services/api';
+import ImageNode from '@/components/ImageNode.vue';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import Textarea from 'primevue/textarea';
 
 const route = useRoute();
 const { onConnect, addEdges, onNodesChange, onEdgesChange } = useVueFlow();
+const nodeTypes = {
+  imageNode: markRaw(ImageNode),
+};
 
 const elements = ref([]);
 const isLoading = ref(true);
@@ -19,22 +23,25 @@ const error = ref(null);
 const isEditDialogVisible = ref(false);
 const editingNote = ref(null);
 const editingText = ref('');
+const editingImageUrl = ref('');
 
 onMounted(async () => {
     try {
-        const wallId = route.params.id;
-        const wallData = await getWallById(wallId);
+        const wallData = await getWallById(route.params.id);
 
         const nodes = wallData.notes.map((note, index) => {
             const hasSavedPosition = note.positionX !== null && note.positionY !== null;
             
             return {
                 id: note.id,
-                label: note.textContent || 'Nota sem texto',
+                type: 'imageNode',
                 position: hasSavedPosition
                     ? { x: note.positionX, y: note.positionY }
                     : { x: (index * 250) % 1000, y: Math.floor(index / 4) * 120 },
-                type: 'default',
+                data: {
+                    label: note.textContent || 'Nota sem texto',
+                    imageUrl: note.imageUrl,
+                }
             };
         });
 
@@ -83,7 +90,22 @@ onEdgesChange((changes) => {
     changes.forEach(change => {
         if (change.type === 'remove') {
             console.log('Aresta removido:', change.id);
-            //deletar arestas no futuro
+
+            const removedEdge = elements.value.find(el => el.id === change.id);
+
+            if (removedEdge) {
+                const wallId = route.params.id;
+
+                const edgeDataToDelete = {
+                    sourceId: removedEdge.source,
+                    targetId: removedEdge.target,
+                    wallId: wallId,
+                };
+
+                deleteEdge(edgeDataToDelete).catch(error => {
+                    console.error("Erro ao deletar a aresta na API", error);
+                });
+            }
         }
     });
 });
@@ -102,9 +124,12 @@ async function handleAddNewNote() {
         //api pro vueflow
         const newNode ={
             id: newNoteFromApi.id,
-            label: newNoteFromApi.textContent,
+            type: 'imageNode',
             position: { x: 100, y:100},
-            type: 'default',
+            data: {
+                label: newNoteFromApi.textContent,
+                imageUrl: null,
+            }
         };
 
         elements.value.push(newNode);
@@ -129,7 +154,8 @@ function onNodeDragStop(event) {
 
 function openEditDialog({ node }) {
     editingNote.value = node;
-    editingText.value = node.label;
+    editingText.value = node.data.label;
+    editingImageUrl.value = node.data.imageUrl;
     isEditDialogVisible.value = true;
 }
 
@@ -137,14 +163,18 @@ async function handleUpdateNote() {
     if (!editingNote.value) return;
 
     const noteId = editingNote.value.id;
-    const newText = editingText.value;
+    const dataToUpdate = {
+        textContent: editingText.value,
+        imageUrl: editingImageUrl.value,
+    };
 
     try {
-        await updateNote(noteId, { textContent: newText });
+        await updateNote(noteId, dataToUpdate);
 
         const nodeInElements = elements.value.find(el => el.id === noteId);
         if (nodeInElements) {
-            nodeInElements.label = newText;
+            nodeInElements.data.label = editingText.value;
+            nodeInElements.data.imageUrl = editingImageUrl.value;
         }
 
         isEditDialogVisible.value = false;
@@ -162,11 +192,14 @@ async function handleUpdateNote() {
     <div class="map-container">
         <div v-if="isLoading">Carregando mapa...</div>
         <div v-else-if="error">{{ error }}</div>
+
         <VueFlow 
             v-else 
             v-model="elements" 
+            :node-types="nodeTypes"
             @node-double-click="openEditDialog" 
             @node-drag-stop="onNodeDragStop" 
+            @connect="onConnect"
             fit-view-on-init
         >
             <Background />
@@ -183,7 +216,12 @@ async function handleUpdateNote() {
             :style="{ width: '30rem' }"
         >
             <div class="form-group">
-                <Textarea v-model="editingText" rows="5" class="w-full" />
+                <label for="note-text">Texto da Nota</label>
+                <Textarea id="note-text" v-model="editingText" rows="5" class="w-full" />
+            </div>
+            <div class="form-group">
+                <label for="note-image">URL da Imagem</label>
+                <InputText id="note-image" v-model="editingImageUrl" class="w-full" placeholder="Cole o link da imagem aqui" />
             </div>
 
             <template #footer>

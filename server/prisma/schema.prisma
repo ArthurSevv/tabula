@@ -50,7 +50,6 @@ model Note {
   type              NoteType @default(TEXT)
   textContent       String?
   imageUrl          String?
-  linkUrl           String?
   videoUrl          String?
   pdfUrl            String?
   createdAt         DateTime @default(now())
@@ -84,7 +83,6 @@ model Edge {
 enum NoteType {
   TEXT
   IMAGE
-  LINK
   VIDEO
   PDF
 }

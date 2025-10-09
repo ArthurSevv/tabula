@@ -193,22 +193,22 @@ export async function createEdge(edgeData) {
     return handleResponse(response);
 }
 
-export async function deleteEdge(edgeId) {
+export async function deleteEdge(edgeData) {
     const userData = JSON.parse(localStorage.getItem('userData'));
     const token = userData ? userData.token : null;
     if (!token) throw new Error("Token de autenticaçao não encontrado.");
 
-    const response = await fetch(`${EDGES_API_URL}/${edgeId}`, {
+    const response = await fetch(EDGES_API_URL, {
         method: 'DELETE',
         headers: {
+            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(edgeData)
     });
 
     if (!response.ok) {
-        const errorData = { message: `Erro ao deletar a conexão.` };
-        throw new Error(errorData.message);
+        throw new Error('Erro ao deletar a conexão.');
     }
     return true;
 }

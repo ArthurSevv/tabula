@@ -91,6 +91,33 @@ export async function updateNotePosition(req, res) {
     }
 }
 
+export async function updateNoteImage(req, res) {
+    const { id } = req.params;
+    const { imageUrl } = req.body;
+    const userId = req.user.id;
+
+    try {
+        const note = await prisma.note.findUnique({
+            where: { id },
+            include: { wall: true }
+        });
+
+        if (!note || note.wall.ownerId !== userId) {
+            return res.status(403).json({ message: "Acesso negado." });
+        }
+
+        const updateNote = await prisma.note.update({
+            where: { id: id },
+            data: { imageUrl: imageUrl }
+        });
+
+        return res.status(200).json(updatedNote);
+    } catch (error) {
+        console.error("ERRO AO ATUALIZAR IMAGEM DA NOTA:", error);
+        return res.status(500).json({ message: "Erro ao atualizar a imagem da nota" });
+    }
+}
+
 export async function deleteNote(req, res) {
     const { id: noteId } = req.params;
     const userId = req.user.id;

@@ -22,24 +22,28 @@ export async function createEdge(req, res) {
 }
 
 export async function deleteEdge(req, res) {
-    const { id: edgeId } = req.params;
+    const { sourceId, targetId, wallId } = req.body;
     const userId = req.user.id;
 
     try {
-        const edge = await prisma.edge.findUnique({ 
-            where: { id: edgeId },
-            include: { wall: true }
+        const wall = await prisma.wall.findUnique({
+            where: { id: wallId },
         });
 
-        if (!edge || edge.wall.ownerId !== userId) {
+        if (!wall || wall.ownerId !== userId) {
             return res.status(403).json({ message: "Acesso negado." })
         }
 
-        await prisma.edge.delete({
-            where: { id: edgeId }
+        await prisma.edge.deleteMany({
+            where: {
+                sourceId: sourceId,
+                targetId: targetId,
+                wallId: wallId
+            }
         });
 
         return res.status(204).send();
+
     }catch (error) {
         console.error("ERRO AO DELETAR ARESTA:", error);
         return res.status(500).json({ message: "Erro ao deletar a conexão" });

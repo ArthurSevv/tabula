@@ -5,6 +5,6 @@ import { protect } from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 router.post('/', protect, createEdge);
-router.delete('/:id', protect, deleteEdge);
+router.delete('/', protect, deleteEdge);
 
 export default router;

@@ -17,6 +17,7 @@ import InputText from 'primevue/inputtext';
 import Dialog from 'primevue/dialog';
 import Textarea from 'primevue/textarea';
 import ConfirmationService from 'primevue/confirmationservice';
+import Tooltip from 'primevue/tooltip';
 
 const app = createApp(App)
 
@@ -36,5 +37,6 @@ app.use(PrimeVue, {
     }
 });
 app.use(ConfirmationService)
+app.directive('tooltip', Tooltip);
 
 app.mount('#app');
