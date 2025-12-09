@@ -1,6 +1,7 @@
 <template>
-    <div class="auth-container">
-        <Card style="width: 25rem; overflow: hidden;">
+        <div class="auth-page">
+            <div class="auth-container">
+                <Card class="auth-card" style="width: 100%; overflow: hidden;">
             <template #title>
                 <!--AQUI TEMOS ESSA COISA LINDA QUE MUDA A TELA CONFORME O ESTADO DE LOGIN-->
                 {{ isLoginMode ? 'Entrar na sua conta' : 'Criar uma nova conta' }}
@@ -58,8 +59,9 @@
                     />
                 </div>
             </template>
-        </Card>
-    </div>
+                </Card>
+            </div>
+        </div>
 </template>
 
 <script setup>
@@ -111,25 +113,28 @@ async function handleSubmit() {
 </script>
 
 <style>
-body {
-    background-color: #f0f2f5;
+.auth-page {
+    min-height: calc(100vh - 40px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    padding: 2rem;
 }
 .auth-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    width: 100%;
+    max-width: 420px;
 }
-.flex-col {
-    display: flex;
-    flex-direction: column;
+.auth-card {
+    padding: 1rem;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(2,6,23,0.06);
+    background: #ffffff;
 }
-.gap-2 {
-    gap: 0.5rem;
-}
-.gap-3 {
-    gap: 0.75rem;
-}
-.gap-4 {
-    gap: 1rem;
-}
+.error-message { color: #dc2626; }
+.flex-col { display:flex; flex-direction:column; }
+.gap-2 { gap:0.5rem; }
+.gap-3 { gap:0.75rem; }
+.gap-4 { gap:1rem; }
+.auth-footer .p-button { font-weight:700 }
 </style>

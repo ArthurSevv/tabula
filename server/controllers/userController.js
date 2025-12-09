@@ -31,6 +31,7 @@ export async function registerUser(req, res) {
             id: user.id,
             name: user.name,
             email: user.email,
+            avatarUrl: user.avatarUrl || null,
             token: generateToken(user.id)
         })
         
@@ -64,11 +65,30 @@ export async function loginUser(req, res) {
             id: userExist.id,
             name: userExist.name,
             email: userExist.email,
+            avatarUrl: userExist.avatarUrl || null,
             token: generateToken(userExist.id)
         })
 
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Erro interno' });
+    }
+}
+
+export async function updateAvatar(req, res) {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        if (parseInt(id) !== userId) return res.status(403).json({ message: 'Acesso negado.' });
+
+        const { avatarUrl } = req.body;
+        if (!avatarUrl) return res.status(400).json({ message: 'avatarUrl obrigatório.' });
+
+        const updated = await prisma.user.update({ where: { id: userId }, data: { avatarUrl } });
+
+        return res.status(200).json({ id: updated.id, name: updated.name, email: updated.email, avatarUrl: updated.avatarUrl });
+    } catch (err) {
+        console.error('Erro ao atualizar avatar:', err);
+        return res.status(500).json({ message: 'Erro interno' });
     }
 }

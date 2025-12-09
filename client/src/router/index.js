@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from '@/views/HomeView.vue';
 import AuthView from '@/views/AuthView.vue';
 import MapView from '../views/MapView.vue'
+import PublicWallView from '@/views/PublicWallView.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -21,12 +22,18 @@ const router = createRouter({
       name: 'map',
       component: MapView
     },
+    {
+      path: '/walls/share/:id',
+      name: 'public-wall',
+      component: PublicWallView
+    },
   ],
 })
 
 router.beforeEach((to, from, next) => {
   const publicPages = ['/auth']
-  const authRequired = !publicPages.includes(to.path);
+  // allow public access to share links
+  const authRequired = !(to.path.startsWith('/walls/share') || publicPages.includes(to.path));
   const loggedIn = localStorage.getItem('userData');
 
   if (authRequired && !loggedIn) {

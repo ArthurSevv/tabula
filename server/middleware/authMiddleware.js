@@ -10,8 +10,13 @@ export const protect = async (req, res, next) => {
         try {
             //pega o token
             token = req.headers.authorization.split(' ')[1];
-            //checa o secret
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            // use configured secret or fallback for development
+            const secret = process.env.JWT_SECRET || 'dev_secret_tabula_fallback_change_in_prod';
+            if (!process.env.JWT_SECRET) {
+                console.warn('Warning: JWT_SECRET not set in environment — using fallback secret for development.');
+            }
+
+            const decoded = jwt.verify(token, secret);
 
             req.user = await prisma.user.findUnique({ where: { id: decoded.id }, select: { id: true, name: true, email: true }});
             next();

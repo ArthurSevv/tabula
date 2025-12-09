@@ -1,17 +1,88 @@
-:root {
-  --color-background: #fdfaf6;
-  --color-surface: #ffffff;
-  --color-primary: #a7c7e7;
-  --color-secondary: #e0e0e0;
-  --color-text-primary: #3a3a3a;
-  --color-text-secondary: #7f7f7f;
-  --color-error: #ffb4a2;
-  --shadow-color: rgba(0, 0, 0, 0.08);
+/* Global base styles (neutral/default) */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff; /* light background for legibility */
+  color: #0f1724; /* dark slate for high contrast */
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  line-height: 1.5;
+  font-size: 16px;
 }
 
-body {
-  background-color: var(--color-background);
-  color: var(--color-text-primary);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  margin: 0;
+/* Buttons / interactive controls */
+.p-button, .button, button {
+  border-radius: 8px;
+  background-color: #0f1724; /* dark button */
+  color: #ffffff;
+  border: 1px solid rgba(15,23,36,0.08);
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+}
+.p-button.p-button-text, .p-button-text {
+  background: transparent !important;
+  color: #0f1724 !important;
+}
+.p-button:hover, .button:hover, button:hover {
+  filter: brightness(0.95);
+}
+
+/* Cards */
+.p-card, .card, .wall-card {
+  background: #ffffff;
+  border: 1px solid rgba(15,23,36,0.06);
+  box-shadow: 0 6px 18px rgba(2,6,23,0.04);
+}
+
+/* Improve selected/hover/active visibility for wall cards */
+.wall-card {
+  transition: box-shadow .15s ease, transform .12s ease, background-color .12s ease;
+}
+.wall-card:hover,
+.wall-card:active,
+.wall-card:focus-within {
+  background-color: #f8fafc; /* subtle light surface */
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(2,6,23,0.06);
+}
+.wall-card:active { background-color: #eef2ff; }
+
+/* Stronger title + actions contrast */
+.wall-card .card-title span {
+  color: #0f1724;
+  font-weight: 700;
+}
+.card-actions .p-button, .card-actions button, .p-button-icon {
+  color: #0f1724 !important;
+  background: transparent !important;
+  border: none !important;
+}
+.card-actions .p-button:hover, .card-actions button:hover {
+  background: rgba(37,99,235,0.06) !important; /* subtle hover */
+  color: #2563eb !important;
+}
+
+/* Inputs */
+input, textarea, .p-inputtext {
+  border-radius: 8px;
+  border: 1px solid rgba(15,23,36,0.1);
+  padding: 8px;
+  background: #ffffff;
+  color: #0f1724;
+}
+
+/* Muted text for helpers */
+.small-muted { color: #6b7280; }
+
+/* Primary CTA color */
+:root {
+  --cta-color: #2563eb; /* blue */
+}
+.p-button--primary, .p-button.primary, .button.primary {
+  background-color: var(--cta-color) !important;
+  color: white !important;
+}
+
+/* Ensure links/icons in card-actions are visible */
+.card-actions .p-button, .card-actions button, .p-button-icon {
+  color: #0f1724 !important;
 }

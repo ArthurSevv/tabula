@@ -2,6 +2,7 @@ const API_URL = "http://localhost:3000/api/users";
 const WALLS_API_URL = "http://localhost:3000/api/walls";
 const NOTES_API_URL = "http://localhost:3000/api/notes";
 const EDGES_API_URL = "http://localhost:3000/api/edges";
+const UPLOADS_API_URL = "http://localhost:3000/api/uploads";
 
 async function handleResponse(response) {
     const data = await response.json();
@@ -11,6 +12,17 @@ async function handleResponse(response) {
         throw new Error(error);
     }
     return data;
+}
+
+function getAuthHeaders(extraHeaders = {}) {
+    const headers = { ...extraHeaders };
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    const token = userData ? userData.token : null;
+    const shareToken = localStorage.getItem('shareToken') || null;
+
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (shareToken) headers['x-share-token'] = shareToken;
+    return headers;
 }
 
 export async function register(userData) {
@@ -86,6 +98,27 @@ export async function getWallById(wallId) {
     return handleResponse(response);
 }
 
+export async function getPublicWall(wallId) {
+    const response = await fetch(`${WALLS_API_URL}/share/${wallId}`, {
+        method: 'GET'
+    });
+    return handleResponse(response);
+}
+
+export async function generateShareLink(wallId) {
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    const token = userData ? userData.token : null;
+    if (!token) throw new Error('Token de autenticação não encontrado.');
+
+    const response = await fetch(`${WALLS_API_URL}/${wallId}/share`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+    return handleResponse(response);
+}
+
 export async function deleteWall(wallId) {
     const userData = JSON.parse(localStorage.getItem('userData'));
     const token = userData ? userData.token : null;
@@ -104,21 +137,31 @@ export async function deleteWall(wallId) {
     return true;
 }
 
-//------------------------------------------------------------------
-//FUNCOES DAS NOTES
-
-export async function createNote(noteData) {
+export async function updateWall(wallId, wallData) {
     const userData = JSON.parse(localStorage.getItem('userData'));
     const token = userData ? userData.token : null;
-    if (!token) throw new Error("Token de autenticaçao não encontrado.");
+    if (!token) throw new Error("Token de autenticação não encontrado.");
 
-    const response = await fetch(NOTES_API_URL, {
-        method: 'POST',
+    const response = await fetch(`${WALLS_API_URL}/${wallId}`, {
+        method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(noteData)
+        body: JSON.stringify(wallData)
+    });
+    return handleResponse(response);
+}
+
+//------------------------------------------------------------------
+//FUNCOES DAS NOTES
+
+export async function createNote(noteData) {
+    const headers = getAuthHeaders({ 'Content-Type': 'application/json' });
+    const response = await fetch(NOTES_API_URL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ...noteData, shareLink: localStorage.getItem('shareToken') || undefined })
     });
     return handleResponse(response);
 }
@@ -140,17 +183,11 @@ export async function updateNote(noteId, noteData) {
 }
 
 export async function updateNotePosition(noteId, position) {
-    const userData = JSON.parse(localStorage.getItem('userData'));
-    const token = userData ? userData.token : null;
-    if (!token) throw new Error("Token de autenticaçao não encontrado.");
-
+    const headers = getAuthHeaders({ 'Content-Type': 'application/json' });
     const response = await fetch(`${NOTES_API_URL}/${noteId}/position`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ position })
+        headers,
+        body: JSON.stringify({ position, shareLink: localStorage.getItem('shareToken') || undefined })
     });
     return handleResponse(response);
 }
@@ -178,37 +215,55 @@ export async function deleteNote(noteId) {
 //edges
 
 export async function createEdge(edgeData) {
-    const userData = JSON.parse(localStorage.getItem('userData'));
-    const token = userData ? userData.token : null;
-    if (!token) throw new Error("Token de autenticaçao não encontrado.");
-
+    const headers = getAuthHeaders({ 'Content-Type': 'application/json' });
     const response = await fetch(EDGES_API_URL, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(edgeData)
+        headers,
+        body: JSON.stringify({ ...edgeData, shareLink: localStorage.getItem('shareToken') || undefined })
     });
     return handleResponse(response);
 }
 
 export async function deleteEdge(edgeData) {
-    const userData = JSON.parse(localStorage.getItem('userData'));
-    const token = userData ? userData.token : null;
-    if (!token) throw new Error("Token de autenticaçao não encontrado.");
-
+    const headers = getAuthHeaders({ 'Content-Type': 'application/json' });
     const response = await fetch(EDGES_API_URL, {
         method: 'DELETE',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(edgeData)
+        headers,
+        body: JSON.stringify({ ...edgeData, shareLink: localStorage.getItem('shareToken') || undefined })
     });
 
     if (!response.ok) {
         throw new Error('Erro ao deletar a conexão.');
     }
     return true;
+}
+
+// update user avatar
+export async function updateUserAvatar(userId, avatarUrl) {
+    const headers = getAuthHeaders({ 'Content-Type': 'application/json' });
+    const response = await fetch(`${API_URL}/${userId}/avatar`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ avatarUrl })
+    });
+    return handleResponse(response);
+}
+
+export async function uploadFile(file) {
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    const token = userData ? userData.token : null;
+    if (!token) throw new Error("Token de autenticaçao não encontrado.");
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(UPLOADS_API_URL, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
+        body: formData
+    });
+
+    return handleResponse(response);
 }

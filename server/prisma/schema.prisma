@@ -9,80 +9,57 @@ generator client {
 }
 
 datasource db {
-  provider = "mongodb"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
-  name              String
-  email             String   @unique
-  hashedPassword    String
-  walls             Wall[]
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  name           String
+  email          String   @unique
+  hashedPassword String
+  avatarUrl      String?
+  walls          Wall[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Wall {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
-  title             String
-  shareLink         String?   
-  createdAt         DateTime @default(now())
-  ownerId           String   @db.ObjectId
-  owner             User     @relation(fields: [ownerId], references: [id])
-  
-  notes             Note[]
-  edges             Edge[]
-}
-
-model NoteConnections {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
-
-  sourceNoteId      String   @db.ObjectId
-  targetNoteId      String   @db.ObjectId
-
-  sourceNote        Note     @relation("sourceConnections", fields: [sourceNoteId], references: [id])
-  targetNote        Note     @relation("targetConnections", fields: [targetNoteId], references: [id])
+  id        Int      @id @default(autoincrement())
+  title     String
+  shareLink String?
+  createdAt DateTime @default(now())
+  ownerId   Int
+  owner     User     @relation(fields: [ownerId], references: [id])
+  notes     Note[]
+  edges     Edge[]
 }
 
 model Note {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
-  type              NoteType @default(TEXT)
-  textContent       String?
-  imageUrl          String?
-  videoUrl          String?
-  pdfUrl            String?
-  createdAt         DateTime @default(now())
-
-  positionX         Float?
-  positionY         Float?
-
-  wallId            String   @db.ObjectId
-  wall              Wall     @relation(fields: [wallId], references: [id])
-
-  //1 - *
-  sourceConnection  NoteConnections[] @relation("sourceConnections")
-
-  //1 - *
-  targetConnections NoteConnections[] @relation("targetConnections")
+  id          Int      @id @default(autoincrement())
+  type        NoteType @default(TEXT)
+  textContent String?
+  imageUrl    String?
+  linkUrl     String?
+  createdAt   DateTime @default(now())
+  authorId    Int
+  positionX   Float?
+  positionY   Float?
+  wallId      Int
+  wall        Wall     @relation(fields: [wallId], references: [id])
 }
 
 model Edge {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
-  sourceId          String
-  targetId          String
-
-  wallId            String   @db.ObjectId
-  wall              Wall     @relation(fields: [wallId], references: [id])
-
-  createAt          DateTime @default(now())
+  id       Int      @id @default(autoincrement())
+  sourceId String
+  targetId String
+  wallId   Int
+  wall     Wall     @relation(fields: [wallId], references: [id])
+  createAt DateTime @default(now())
 }
-
-//enumerations
 
 enum NoteType {
   TEXT
   IMAGE
-  VIDEO
-  PDF
+  LINK
 }
