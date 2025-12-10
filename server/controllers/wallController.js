@@ -1,10 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 import crypto from 'crypto';
+import { getIo } from '../utils/io.js'; // Importando socket io
+
 const prisma = new PrismaClient();
 
 export async function createWall(req, res) {
     try {
-        const { title } = req.body;
+        const { title, backgroundColor, backgroundImage } = req.body; // Pode receber cores na criação se quiser
         const ownerId = req.user.id;
 
         if (!title) {
@@ -17,6 +19,8 @@ export async function createWall(req, res) {
                 title: title,
                 ownerId: ownerId,
                 shareLink: shareLink,
+                backgroundColor: backgroundColor || '#f0f0f0',
+                backgroundImage: backgroundImage || null
             }
         });
 
@@ -31,6 +35,10 @@ export async function getWallById(req, res) {
     try {
         const wallId = parseInt(req.params.id);
         const userId = req.user.id;
+        
+        // Pega o token da Query (?shareLink=...) ou do Header
+        const shareLink = req.query.shareLink || req.headers['x-share-token'];
+
         const wall = await prisma.wall.findUnique({
             where: { id: wallId },
             include: { 
@@ -43,11 +51,16 @@ export async function getWallById(req, res) {
             return res.status(404).json({ message: "Mural não encontrado." });
         }
 
-        if (wall.ownerId !== userId) {
-            return res.status(403).json({ message: "Acesso negado. Você Nõ é o proprietário deste mural." });
+        // VERIFICAÇÃO DE SEGURANÇA CORRIGIDA:
+        // Permite se for o Dono OU se o token enviado bater com o do mural
+        const isOwner = wall.ownerId === userId;
+        const hasValidToken = (shareLink && wall.shareLink === shareLink);
+
+        if (!isOwner && !hasValidToken) {
+            return res.status(403).json({ message: "Acesso negado. Você Não é o proprietário deste mural." });
         }
 
-        // Attach author names to notes for the authenticated view as well
+        // Attach author names (mesma lógica de antes)
         const authorIds = [...new Set(wall.notes.map(n => n.authorId))].filter(Boolean);
         let authors = [];
         if (authorIds.length > 0) {
@@ -59,7 +72,12 @@ export async function getWallById(req, res) {
             author: authors.find(a => a.id === n.authorId) || null
         }));
 
-        const wallWithAuthors = { ...wall, notes: notesWithAuthor };
+        // Adiciona flag para o front saber se é dono ou visitante
+        const wallWithAuthors = { 
+            ...wall, 
+            notes: notesWithAuthor,
+            isOwner: isOwner // Útil para o front esconder botões de delete do mural, etc.
+        };
 
         res.status(200).json(wallWithAuthors);
     } catch (error) {
@@ -120,16 +138,14 @@ export async function deleteWall(req, res) {
 
 export async function updateWall(req, res) {
     const { id } = req.params;
-    const { title } = req.body;
+    // Adicionei backgroundColor e backgroundImage
+    const { title, backgroundColor, backgroundImage } = req.body;
     const userId = req.user.id;
 
-    if (!title) {
-        return res.status(400).json({ message: "O título é obrigatório." });
-    }
-
     try {
+        const wallId = parseInt(id);
         const wall = await prisma.wall.findUnique({
-            where: { id: parseInt(id) },
+            where: { id: wallId },
         });
 
         if (!wall) {
@@ -140,10 +156,22 @@ export async function updateWall(req, res) {
             return res.status(403).json({ message: "Acesso negado." });
         }
 
+        // Monta objeto de update dinâmico
+        const dataToUpdate = {};
+        if (title) dataToUpdate.title = title;
+        if (backgroundColor) dataToUpdate.backgroundColor = backgroundColor;
+        if (backgroundImage !== undefined) dataToUpdate.backgroundImage = backgroundImage;
+
         const updatedWall = await prisma.wall.update({
-            where: { id: parseInt(id) },
-            data: { title },
+            where: { id: wallId },
+            data: dataToUpdate,
         });
+
+        // EMITIR SOCKET PARA ATUALIZAR FUNDO EM TEMPO REAL
+        const io = getIo();
+        if (io) {
+            io.to(`wall:${wallId}`).emit('wallUpdated', updatedWall);
+        }
 
         res.status(200).json(updatedWall);
     } catch (error) {

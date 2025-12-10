@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -25,23 +22,24 @@ model User {
 }
 
 model Wall {
-  id        Int      @id @default(autoincrement())
-  title     String
-  shareLink String?
-  createdAt DateTime @default(now())
-  ownerId   Int
-  owner     User     @relation(fields: [ownerId], references: [id])
-  notes     Note[]
-  edges     Edge[]
+  id              Int      @id @default(autoincrement())
+  title           String
+  shareLink       String?
+  backgroundColor String?  @default("#f0f0f0") // Novo campo para cor de fundo
+  backgroundImage String?                      // Novo campo para imagem de fundo
+  createdAt       DateTime @default(now())
+  ownerId         Int
+  owner           User     @relation(fields: [ownerId], references: [id])
+  notes           Note[]
+  edges           Edge[]
 }
 
 model Note {
   id          Int      @id @default(autoincrement())
   type        NoteType @default(TEXT)
   textContent String?
-  imageUrl    String?
-  linkUrl     String?
-  createdAt   DateTime @default(now())
+  mediaUrl    String? 
+  color       String?  @default("#ffffff") // Novo campo para cor da nota
   authorId    Int
   positionX   Float?
   positionY   Float?
@@ -50,16 +48,17 @@ model Note {
 }
 
 model Edge {
-  id       Int      @id @default(autoincrement())
+  id       Int    @id @default(autoincrement())
   sourceId String
   targetId String
   wallId   Int
-  wall     Wall     @relation(fields: [wallId], references: [id])
-  createAt DateTime @default(now())
+  wall     Wall   @relation(fields: [wallId], references: [id])
 }
 
 enum NoteType {
   TEXT
   IMAGE
+  VIDEO
+  PDF
   LINK
 }
