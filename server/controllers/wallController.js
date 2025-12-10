@@ -1,19 +1,22 @@
 import { PrismaClient } from "@prisma/client";
 import crypto from 'crypto';
-import { getIo } from '../utils/io.js'; // Importando socket io
+import { getIo } from '../utils/io.js';
 
 const prisma = new PrismaClient();
 
+// cria um novo mural
 export async function createWall(req, res) {
     try {
-        const { title, backgroundColor, backgroundImage } = req.body; // Pode receber cores na criação se quiser
+        const { title, backgroundColor, backgroundImage } = req.body;
         const ownerId = req.user.id;
 
         if (!title) {
-            return res.status(400).json({ message: "O título é obrigatório."})
+            return res.status(400).json({ message: "o titulo e obrigatorio."})
         }
         
+        // gera um link unico de compartilhamento automaticamente
         const shareLink = crypto.randomUUID();
+        
         const newWall = await prisma.wall.create({
             data: {
                 title: title,
@@ -26,17 +29,19 @@ export async function createWall(req, res) {
 
         res.status(201).json(newWall);
     } catch (error) {
-        console.error("Erro ao criar mural:", error);
-        res.status(500).json({ message: "Erro interno do servidor." });
+        console.error("erro ao criar mural:", error);
+        res.status(500).json({ message: "erro interno do servidor." });
     }
 }
 
+// busca mural por id (rota protegida)
+// permite acesso se for dono OU se tiver token de compartilhamento valido
 export async function getWallById(req, res) {
     try {
         const wallId = parseInt(req.params.id);
         const userId = req.user.id;
         
-        // Pega o token da Query (?shareLink=...) ou do Header
+        // pega o token da query string ou header
         const shareLink = req.query.shareLink || req.headers['x-share-token'];
 
         const wall = await prisma.wall.findUnique({
@@ -48,19 +53,19 @@ export async function getWallById(req, res) {
         });
 
         if (!wall) {
-            return res.status(404).json({ message: "Mural não encontrado." });
+            return res.status(404).json({ message: "mural nao encontrado." });
         }
 
-        // VERIFICAÇÃO DE SEGURANÇA CORRIGIDA:
-        // Permite se for o Dono OU se o token enviado bater com o do mural
+        // verificacao de seguranca:
+        // permite se for dono OU se o token enviado bater com o do mural
         const isOwner = wall.ownerId === userId;
         const hasValidToken = (shareLink && wall.shareLink === shareLink);
 
         if (!isOwner && !hasValidToken) {
-            return res.status(403).json({ message: "Acesso negado. Você Não é o proprietário deste mural." });
+            return res.status(403).json({ message: "acesso negado." });
         }
 
-        // Attach author names (mesma lógica de antes)
+        // anexa autores as notas para exibir no front
         const authorIds = [...new Set(wall.notes.map(n => n.authorId))].filter(Boolean);
         let authors = [];
         if (authorIds.length > 0) {
@@ -72,32 +77,32 @@ export async function getWallById(req, res) {
             author: authors.find(a => a.id === n.authorId) || null
         }));
 
-        // Adiciona flag para o front saber se é dono ou visitante
         const wallWithAuthors = { 
             ...wall, 
             notes: notesWithAuthor,
-            isOwner: isOwner // Útil para o front esconder botões de delete do mural, etc.
+            isOwner: isOwner 
         };
 
         res.status(200).json(wallWithAuthors);
     } catch (error) {
-        console.error("Erro ao buscar mural por ID:", error);
-        res.status(500).json({ message: "Erro interno do servidor."})
+        console.error("erro ao buscar mural:", error);
+        res.status(500).json({ message: "erro interno do servidor."})
     }
 }
 
+// lista murais do usuario logado
 export async function getUserWalls(req, res) {
     try {
-        // O middleware 'protect' já nos deu o 'req.user'!
         const walls = await prisma.wall.findMany({
-            where: { ownerId: req.user.id } // Buscamos apenas os murais cujo dono é o usuário logado
+            where: { ownerId: req.user.id } 
         });
         res.status(200).json(walls);
     } catch (error) {
-        res.status(500).json({ message: "Erro ao buscar os murais." });
+        res.status(500).json({ message: "erro ao buscar os murais." });
     }
 }
 
+// deleta um mural e tudo relacionado a ele
 export async function deleteWall(req, res) {
     const { id: wallId } = req.params;
     const userId = req.user.id;
@@ -107,56 +112,46 @@ export async function deleteWall(req, res) {
             where: { id: parseInt(wallId) },
         });
 
-        if (!wall) {
-            return res.status(404).json({ message: "Mural não encontrado." });
-        }
+        if (!wall) return res.status(404).json({ message: "mural nao encontrado." });
+        
+        // apenas o dono pode deletar o mural inteiro
         if (wall.ownerId !== userId) {
-            return res.status(403).json({ message: "Acesso negado."});
+            return res.status(403).json({ message: "acesso negado."});
         }
 
         const wallIdInt = parseInt(wallId);
+        
+        // transacao para garantir que tudo seja deletado ou nada
         await prisma.$transaction([
-            //deleta arestas do mural
-            prisma.edge.deleteMany({
-                where: { wallId: wallIdInt },
-            }),
-            //deleta notas do mural
-            prisma.note.deleteMany({
-                where: { wallId: wallIdInt },
-            }),
-            //deleta o mural
-            prisma.wall.delete({
-                where: { id: wallIdInt },
-            }),
+            prisma.edge.deleteMany({ where: { wallId: wallIdInt } }),
+            prisma.note.deleteMany({ where: { wallId: wallIdInt } }),
+            prisma.wall.delete({ where: { id: wallIdInt } }),
         ]);
+        
         return res.status(204).send();
     } catch (error) {
-        console.error("ERRO AO DELETAR MURAL:", error);
-        return res.status(500).json({ message: "Erro ao deletar o mural." });
+        console.error("erro ao deletar mural:", error);
+        return res.status(500).json({ message: "erro ao deletar o mural." });
     }
 }
 
+// atualiza informacoes do mural (titulo, cor, imagem)
 export async function updateWall(req, res) {
     const { id } = req.params;
-    // Adicionei backgroundColor e backgroundImage
     const { title, backgroundColor, backgroundImage } = req.body;
     const userId = req.user.id;
 
     try {
         const wallId = parseInt(id);
-        const wall = await prisma.wall.findUnique({
-            where: { id: wallId },
-        });
+        const wall = await prisma.wall.findUnique({ where: { id: wallId } });
 
-        if (!wall) {
-            return res.status(404).json({ message: "Mural não encontrado." });
-        }
+        if (!wall) return res.status(404).json({ message: "mural nao encontrado." });
 
         if (wall.ownerId !== userId) {
-            return res.status(403).json({ message: "Acesso negado." });
+            return res.status(403).json({ message: "acesso negado." });
         }
 
-        // Monta objeto de update dinâmico
+        // monta objeto de update dinamico
         const dataToUpdate = {};
         if (title) dataToUpdate.title = title;
         if (backgroundColor) dataToUpdate.backgroundColor = backgroundColor;
@@ -167,7 +162,7 @@ export async function updateWall(req, res) {
             data: dataToUpdate,
         });
 
-        // EMITIR SOCKET PARA ATUALIZAR FUNDO EM TEMPO REAL
+        // notifica mudancas visuais em tempo real
         const io = getIo();
         if (io) {
             io.to(`wall:${wallId}`).emit('wallUpdated', updatedWall);
@@ -175,11 +170,12 @@ export async function updateWall(req, res) {
 
         res.status(200).json(updatedWall);
     } catch (error) {
-        console.error("ERRO AO ATUALIZAR MURAL:", error);
-        res.status(500).json({ message: "Erro ao atualizar o mural." });
+        console.error("erro ao atualizar mural:", error);
+        res.status(500).json({ message: "erro ao atualizar o mural." });
     }
 }
 
+// busca mural publico (rota liberada, somente leitura)
 export async function getPublicWall(req, res) {
     try {
         const wallId = parseInt(req.params.id);
@@ -192,10 +188,10 @@ export async function getPublicWall(req, res) {
         });
 
         if (!wall) {
-            return res.status(404).json({ message: "Mural não encontrado." });
+            return res.status(404).json({ message: "mural nao encontrado." });
         }
 
-        // Attach author names to notes (to avoid schema changes)
+        // anexa autores sem precisar mudar o schema
         const authorIds = [...new Set(wall.notes.map(n => n.authorId))].filter(Boolean);
         let authors = [];
         if (authorIds.length > 0) {
@@ -209,28 +205,35 @@ export async function getPublicWall(req, res) {
 
         const wallWithAuthors = { ...wall, notes: notesWithAuthor };
 
-        // Retorna o mural publicamente, sem checar o dono
         res.status(200).json(wallWithAuthors);
     } catch (error) {
-        console.error("Erro ao buscar mural público:", error);
-        res.status(500).json({ message: "Erro interno do servidor." });
+        console.error("erro ao buscar mural publico:", error);
+        res.status(500).json({ message: "erro interno do servidor." });
     }
 }
 
+// gera ou recupera link de compartilhamento
 export async function generateShareLink(req, res) {
     try {
         const wallId = parseInt(req.params.id);
         const userId = req.user.id;
 
         const wall = await prisma.wall.findUnique({ where: { id: wallId } });
-        if (!wall) return res.status(404).json({ message: 'Mural não encontrado.' });
-        if (wall.ownerId !== userId) return res.status(403).json({ message: 'Acesso negado.' });
+        if (!wall) return res.status(404).json({ message: 'mural nao encontrado.' });
+        
+        if (wall.ownerId !== userId) return res.status(403).json({ message: 'acesso negado.' });
 
-        const newShare = crypto.randomUUID();
-        const updated = await prisma.wall.update({ where: { id: wallId }, data: { shareLink: newShare } });
-        return res.status(200).json({ shareLink: updated.shareLink });
+        // se ja existe, poderia retornar o mesmo, mas aqui renovamos ou mantemos a logica de update
+        // para garantir que sempre haja um link valido
+        let link = wall.shareLink;
+        if (!link) {
+             link = crypto.randomUUID();
+             await prisma.wall.update({ where: { id: wallId }, data: { shareLink: link } });
+        }
+        
+        return res.status(200).json({ shareLink: link });
     } catch (error) {
-        console.error('Erro ao gerar share link:', error);
-        return res.status(500).json({ message: 'Erro interno ao gerar link.' });
+        console.error('erro ao gerar link:', error);
+        return res.status(500).json({ message: 'erro interno ao gerar link.' });
     }
 }

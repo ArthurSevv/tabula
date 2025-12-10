@@ -1,23 +1,22 @@
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 
-// Ensure environment variables are loaded (safe for cases where imports run before index.js calls dotenv)
+// garante que as variaveis de ambiente estejam carregadas
 dotenv.config();
 
 const generateToken = (id) => {
+    // define a chave secreta (usa um fallback para desenvolvimento se nao houver .env)
     const secret = process.env.JWT_SECRET || 'dev_secret_tabula_fallback_change_in_prod';
+
+    // alerta no console se estiver usando a chave insegura
     if (!process.env.JWT_SECRET) {
-        console.warn('Warning: JWT_SECRET not set in environment — using fallback secret for development.');
+        console.warn('aviso: jwt_secret nao definido. usando segredo de desenvolvimento.');
     }
 
-    try {
-        return jwt.sign({ id }, secret, {
-            expiresIn: '30d',
-        });
-    } catch (err) {
-        console.error('Failed to generate JWT token:', err);
-        throw new Error('Erro ao gerar token de autenticação.');
-    }
+    // gera o token assinado com validade de 30 dias
+    return jwt.sign({ id }, secret, {
+        expiresIn: '30d',
+    });
 };
 
 export default generateToken;

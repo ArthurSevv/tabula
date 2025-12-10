@@ -1,14 +1,23 @@
 <script setup>
+// imports de bibliotecas
 import { ref } from 'vue';
-import { register, login } from '@/services/api';
 import { useRouter } from 'vue-router';
+
+// api
+import { register, login } from '@/services/api';
+
+// componentes primevue
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
-import Password from 'primevue/password'; // Usando componente Password para melhor UX
+import Password from 'primevue/password';
+
+// ---------------------------------------------------------
+// estado e configuracao
+// ---------------------------------------------------------
 
 const router = useRouter();
 const isLoginMode = ref(true);
-const isLoading = ref(false); // Novo estado para loading
+const isLoading = ref(false);
 
 const name = ref('');
 const email = ref('');
@@ -16,23 +25,31 @@ const password = ref('');
 const confPassword = ref('');
 const errorMessage = ref('');
 
+// ---------------------------------------------------------
+// funcoes de acao
+// ---------------------------------------------------------
+
+// alterna entre login e cadastro
 function toggleMode(){
     isLoginMode.value = !isLoginMode.value;
     errorMessage.value = '';
-    // Limpa senhas ao trocar de modo
+    
+    // limpa senhas por seguranca ao trocar de modo
     password.value = '';
     confPassword.value = '';
 }
 
+// envio do formulario
 async function handleSubmit() {
     errorMessage.value = '';
 
+    // validacao basica
     if (!isLoginMode.value && password.value !== confPassword.value) {
-        errorMessage.value = "As senhas não coincidem.";
+        errorMessage.value = "as senhas nao coincidem.";
         return;
     }
 
-    isLoading.value = true; // Ativa loading
+    isLoading.value = true;
 
     try{
         let response;
@@ -42,14 +59,15 @@ async function handleSubmit() {
             response = await register({ name: name.value, email: email.value, password: password.value });
         }
         
+        // sucesso: salva dados e redireciona
         localStorage.setItem('userData', JSON.stringify(response));
         router.push('/');
 
     } catch (error) {
-        console.error('Falha na autenticação:', error.message);
-        errorMessage.value = error.message || "Ocorreu um erro. Tente novamente.";
+        console.error('falha na autenticacao:', error.message);
+        errorMessage.value = error.message || "ocorreu um erro. tente novamente.";
     } finally {
-        isLoading.value = false; // Desativa loading
+        isLoading.value = false;
     }
 }
 </script>
@@ -62,22 +80,22 @@ async function handleSubmit() {
                 <div class="brand-logo">T</div>
                 <h1>Tabula</h1>
                 <p class="subtitle">
-                    {{ isLoginMode ? 'Bem-vindo de volta!' : 'Crie sua conta gratuitamente' }}
+                    {{ isLoginMode ? 'bem-vindo de volta!' : 'crie sua conta gratuitamente' }}
                 </p>
             </div>
 
             <div class="auth-form">
                 
                 <div v-if="!isLoginMode" class="input-group slide-in">
-                    <label for="name">Nome completo</label>
+                    <label for="name">nome completo</label>
                     <span class="p-input-icon-left w-full">
                         <i class="pi pi-user" />
-                        <InputText id="name" v-model="name" class="w-full" placeholder="Seu nome" />
+                        <InputText id="name" v-model="name" class="w-full" placeholder="seu nome" />
                     </span>
                 </div>
 
                 <div class="input-group">
-                    <label for="email">E-mail</label>
+                    <label for="email">e-mail</label>
                     <span class="p-input-icon-left w-full">
                         <i class="pi pi-envelope" />
                         <InputText id="email" v-model="email" class="w-full" placeholder="exemplo@email.com" />
@@ -85,9 +103,10 @@ async function handleSubmit() {
                 </div>
 
                 <div class="input-group">
-                    <label for="password">Senha</label>
+                    <label for="password">senha</label>
                     <span class="p-input-icon-left w-full">
-                        <i class="pi pi-lock z-1" /> <Password 
+                        <i class="pi pi-lock z-1" /> 
+                        <Password 
                             id="password" 
                             v-model="password" 
                             class="w-full" 
@@ -100,7 +119,7 @@ async function handleSubmit() {
                 </div>
 
                 <div v-if="!isLoginMode" class="input-group slide-in">
-                    <label for="confPassword">Confirmar senha</label>
+                    <label for="confPassword">confirmar senha</label>
                     <span class="p-input-icon-left w-full">
                         <i class="pi pi-lock z-1" />
                         <Password 
@@ -133,10 +152,10 @@ async function handleSubmit() {
 
                 <div class="toggle-container">
                     <span class="text-gray-600">
-                        {{ isLoginMode ? 'Não tem uma conta?' : 'Já tem uma conta?' }}
+                        {{ isLoginMode ? 'nao tem uma conta?' : 'ja tem uma conta?' }}
                     </span>
                     <a href="#" @click.prevent="toggleMode" class="toggle-link">
-                        {{ isLoginMode ? 'Cadastre-se' : 'Faça login' }}
+                        {{ isLoginMode ? 'cadastre-se' : 'faca login' }}
                     </a>
                 </div>
 
@@ -144,27 +163,26 @@ async function handleSubmit() {
         </div>
         
         <div class="footer-copy">
-            &copy; 2024 Tabula. Todos os direitos reservados.
+            &copy; 2024 tabula. todos os direitos reservados.
         </div>
     </div>
 </template>
 
 <style scoped>
-/* Wrapper Principal */
+/* layout e fundo */
 .auth-wrapper {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background-color: #f8fafc; /* Slate-50 igual Home */
-    /* Pattern sutil opcional */
+    background-color: #f8fafc; /* slate-50 */
     background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
     background-size: 20px 20px;
     padding: 1rem;
 }
 
-/* Caixa Branca (Card) */
+/* card de autenticacao */
 .auth-box {
     width: 100%;
     max-width: 400px;
@@ -175,136 +193,66 @@ async function handleSubmit() {
     border: 1px solid #e2e8f0;
 }
 
-/* Cabeçalho */
-.auth-header {
-    text-align: center;
-    margin-bottom: 2rem;
-}
+/* cabecalho */
+.auth-header { text-align: center; margin-bottom: 2rem; }
 
 .brand-logo {
-    width: 48px;
-    height: 48px;
-    background: linear-gradient(135deg, #4f46e5, #6366f1); /* Indigo Gradient */
-    color: white;
-    font-size: 1.5rem;
-    font-weight: 800;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 48px; height: 48px;
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    color: white; font-size: 1.5rem; font-weight: 800;
+    border-radius: 12px; display: flex; align-items: center; justify-content: center;
     margin: 0 auto 1rem auto;
     box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
 
-.auth-header h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin: 0 0 0.5rem 0;
-}
+.auth-header h1 { font-size: 1.5rem; font-weight: 700; color: #1e293b; margin: 0 0 0.5rem 0; }
+.subtitle { color: #64748b; font-size: 0.9rem; margin: 0; }
 
-.subtitle {
-    color: #64748b;
-    font-size: 0.9rem;
-    margin: 0;
-}
-
-/* Inputs */
-.auth-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
+/* formulario */
+.auth-form { display: flex; flex-direction: column; gap: 1rem; }
 
 .input-group label {
-    display: block;
-    margin-bottom: 0.4rem;
-    color: #334155;
-    font-weight: 500;
-    font-size: 0.9rem;
+    display: block; margin-bottom: 0.4rem; color: #334155;
+    font-weight: 500; font-size: 0.9rem;
 }
 
 .w-full { width: 100%; }
-/* Ajuste fino para o ícone dentro do PrimeVue Input */
 .p-input-icon-left > i { z-index: 10; margin-top: -0.5rem; }
-/* Ajuste para o padding do Password do PrimeVue */
 :deep(.p-password-input) { width: 100%; padding-left: 2.5rem; }
 
-/* Botão */
-.submit-btn {
-    background-color: #4f46e5;
-    border: none;
-    padding: 0.8rem;
-    font-weight: 600;
-}
-.submit-btn:hover {
-    background-color: #4338ca;
-}
+/* botoes */
+.submit-btn { background-color: #4f46e5; border: none; padding: 0.8rem; font-weight: 600; }
+.submit-btn:hover { background-color: #4338ca; }
 
-/* Erro */
+/* mensagem de erro */
 .error-banner {
-    background-color: #fee2e2;
-    color: #b91c1c;
-    padding: 0.75rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    background-color: #fee2e2; color: #b91c1c; padding: 0.75rem;
+    border-radius: 6px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;
 }
 
-/* Toggle Link */
-.toggle-container {
-    text-align: center;
-    font-size: 0.9rem;
-    margin-top: 0.5rem;
-}
+/* rodape do form */
+.toggle-container { text-align: center; font-size: 0.9rem; margin-top: 0.5rem; }
 .text-gray-600 { color: #64748b; }
 
 .toggle-link {
-    color: #4f46e5;
-    font-weight: 600;
-    text-decoration: none;
-    margin-left: 4px;
-    transition: color 0.2s;
+    color: #4f46e5; font-weight: 600; text-decoration: none; margin-left: 4px; transition: color 0.2s;
 }
-.toggle-link:hover {
-    color: #4338ca;
-    text-decoration: underline;
-}
+.toggle-link:hover { color: #4338ca; text-decoration: underline; }
 
-/* Divider */
 .divider {
-    display: flex;
-    align-items: center;
-    text-align: center;
-    margin: 0.5rem 0;
-    color: #94a3b8;
-    font-size: 0.8rem;
+    display: flex; align-items: center; text-align: center; margin: 0.5rem 0;
+    color: #94a3b8; font-size: 0.8rem;
 }
-.divider::before, .divider::after {
-    content: '';
-    flex: 1;
-    border-bottom: 1px solid #e2e8f0;
-}
+.divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #e2e8f0; }
 .divider span { padding: 0 10px; }
 
-/* Rodapé Copyright */
-.footer-copy {
-    margin-top: 2rem;
-    color: #94a3b8;
-    font-size: 0.75rem;
-}
+.footer-copy { margin-top: 2rem; color: #94a3b8; font-size: 0.75rem; }
 
-/* Animação simples */
-.slide-in {
-    animation: fadeIn 0.3s ease-out;
-}
+/* animacoes e utilitarios */
+.slide-in { animation: fadeIn 0.3s ease-out; }
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
 }
-
-/* Correção Z-Index do ícone Password */
 .z-1 { z-index: 1; }
 </style>

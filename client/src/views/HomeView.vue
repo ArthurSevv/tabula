@@ -1,74 +1,115 @@
 <script setup>
+// imports de bibliotecas
 import { ref, onMounted, computed } from 'vue';
-import { getUserWalls, createWall, deleteWall, updateWall, generateShareLink, uploadFile, updateUserAvatar } from '@/services/api';
-import { useConfirm } from "primevue/useconfirm";
 import { useRouter } from 'vue-router';
+import { useConfirm } from "primevue/useconfirm";
 
-// Componentes PrimeVue
+// api
+import { 
+  getUserWalls, createWall, deleteWall, updateWall, 
+  generateShareLink, uploadFile, updateUserAvatar 
+} from '@/services/api';
+
+// componentes primevue
 import ProgressSpinner from 'primevue/progressspinner';
 import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
-import { ConfirmDialog } from 'primevue';
+import ConfirmDialog from 'primevue/confirmdialog';
+
+// ---------------------------------------------------------
+// configuracao inicial
+// ---------------------------------------------------------
 
 const confirm = useConfirm();
 const router = useRouter();
+
+// estado global da view
 const walls = ref([]);
 const userData = ref(JSON.parse(localStorage.getItem('userData')) || null);
 const isLoading = ref(true);
 const error = ref(null);
 
-// Dialogs
+// estados dos dialogos (modais)
 const isDialogVisible = ref(false);
 const newWallTitle = ref('');
 const isEditTitleDialogVisible = ref(false);
 const editingWall = ref(null);
 const editingWallTitle = ref('');
 
+// referencia para input de arquivo
+const avatarFileInput = ref(null);
+
+// ---------------------------------------------------------
+// ciclo de vida
+// ---------------------------------------------------------
+
 onMounted(async () => {
     try {
+        // busca os murais do usuario ao carregar
         walls.value = await getUserWalls();
-    } catch (error) {
-        error.value = "Não foi possível carregar seus murais";
+    } catch (err) {
+        error.value = "nao foi possivel carregar seus murais";
     } finally {
         isLoading.value = false;
     }
 });
 
+// ---------------------------------------------------------
+// funcoes de usuario (auth e avatar)
+// ---------------------------------------------------------
+
 function handleLogout() {
   localStorage.removeItem('userData');
-  router.push('/auth')
+  router.push('/auth');
 }
 
-// Avatar Logic
-const avatarFileInput = ref(null);
+// iniciais do usuario para avatar padrao
+const userInitials = computed(() => {
+  if (!userData.value?.name) return 'U';
+  return userData.value.name.split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase();
+});
+
+// aciona o input file escondido
 function triggerAvatarFileInput(event) {
   if (event && event.stopPropagation) event.stopPropagation();
   avatarFileInput.value.click();
 }
 
+// upload e atualizacao do avatar
 async function onAvatarFileChange(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
+  
   try {
     const res = await uploadFile(file);
     if (res && res.url) {
       const updated = await updateUserAvatar(userData.value.id, res.url);
+      
+      // atualiza localstorage e estado local
       const newUserData = { ...userData.value, avatarUrl: updated.avatarUrl };
       localStorage.setItem('userData', JSON.stringify(newUserData));
       userData.value = newUserData;
-      alert('Avatar atualizado!');
+      
+      alert('avatar atualizado!');
     }
   } catch (err) {
-    console.error('Erro upload avatar:', err);
-    alert('Erro ao atualizar avatar.');
+    console.error('erro upload avatar:', err);
+    alert('erro ao atualizar avatar.');
   }
 }
 
-// Wall Logic
+// ---------------------------------------------------------
+// funcoes de mural (crud)
+// ---------------------------------------------------------
+
+function openWall(wallId) {
+  router.push(`/map/${wallId}`);
+}
+
 async function handleCreateWall() {
   if (!newWallTitle.value.trim()) {
-    alert("O título não pode estar vazio.")
+    alert("o titulo nao pode estar vazio.");
     return;
   }
   try {
@@ -77,33 +118,30 @@ async function handleCreateWall() {
     isDialogVisible.value = false;
     newWallTitle.value = '';
   } catch (err) {
-    alert("Não foi possível criar o mural.")
+    alert("nao foi possivel criar o mural.");
   }
-}
-
-function openWall(wallId) {
-  router.push(`/map/${wallId}`);
 }
 
 function handleDeleteWall(wallId) {
   confirm.require({
-    message: 'Tem certeza? Todas as notas serão perdidas.',
-    header: 'Excluir Mural',
+    message: 'tem certeza? todas as notas serao perdidas.',
+    header: 'excluir mural',
     icon: 'pi pi-exclamation-triangle',
     acceptClass: 'p-button-danger',
-    acceptLabel: 'Excluir',
-    rejectLabel: 'Cancelar',
+    acceptLabel: 'excluir',
+    rejectLabel: 'cancelar',
     accept: async () => {
       try {
         await deleteWall(wallId);
         walls.value = walls.value.filter(wall => wall.id !== wallId);
       } catch (error) {
-        alert("Erro ao deletar.");
+        alert("erro ao deletar.");
       }
     }
   });
 }
 
+// prepara o modal de edicao
 function openEditWallDialog(wall) {
   editingWall.value = wall;
   editingWallTitle.value = wall.title;
@@ -112,47 +150,61 @@ function openEditWallDialog(wall) {
 
 async function handleUpdateWall() {
   if (!editingWall.value || !editingWallTitle.value.trim()) return;
+  
   try {
     const updated = await updateWall(editingWall.value.id, { title: editingWallTitle.value });
+    
+    // atualiza a lista localmente
     const idx = walls.value.findIndex(w => w.id === updated.id);
     if (idx !== -1) walls.value[idx] = updated;
+    
     isEditTitleDialogVisible.value = false;
+    editingWall.value = null;
+    editingWallTitle.value = '';
   } catch (err) {
-    alert('Erro ao atualizar.');
+    alert('erro ao atualizar.');
   }
 }
 
+// ---------------------------------------------------------
+// funcoes de compartilhamento
+// ---------------------------------------------------------
+
+// gera token se necessario e copia link de edicao
 function copyShareLink(wallId) {
   generateShareLink(wallId).then(res => {
     const token = res.shareLink || localStorage.getItem('shareToken');
     const shareUrl = `${window.location.origin}/map/${wallId}?token=${token}`;
+    
     navigator.clipboard.writeText(shareUrl)
-      .then(() => alert('Link copiado!'))
-      .catch(() => alert('Erro ao copiar.'));
+      .then(() => alert('link copiado!'))
+      .catch(() => alert('erro ao copiar.'));
   });
 }
 
+// gera token e copia link (mesma funcao, acao explicita)
 async function handleGenerateShareLink(wallId) {
   try {
     const res = await generateShareLink(wallId);
     const token = res.shareLink;
     const shareUrl = `${window.location.origin}/map/${wallId}?token=${token}`;
     await navigator.clipboard.writeText(shareUrl);
-    alert('Link regenerado e copiado!');
-  } catch (err) { alert('Erro ao gerar link.'); }
+    alert('link regenerado e copiado!');
+  } catch (err) { alert('erro ao gerar link.'); }
 }
 
+// abre a visualizacao publica (somente leitura) em nova aba
 async function openPublicView(wallId) {
-  const res = await generateShareLink(wallId);
-  const token = res?.shareLink;
-  const url = `${window.location.origin}/map/${wallId}?token=${token}`;
-  window.open(url, '_blank');
+  try {
+    const res = await generateShareLink(wallId);
+    const token = res?.shareLink;
+    const url = `${window.location.origin}/walls/share/${wallId}`; // rota especifica publica
+    window.open(url, '_blank');
+  } catch (err) {
+    console.error(err);
+    alert('erro ao abrir visualizacao publica');
+  }
 }
-
-const userInitials = computed(() => {
-  if (!userData.value?.name) return 'U';
-  return userData.value.name.split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase();
-});
 </script>
 
 <template>
@@ -177,8 +229,8 @@ const userInitials = computed(() => {
           />
 
           <div class="user-profile">
-            <div class="avatar-container" @click="triggerAvatarFileInput" title="Alterar foto">
-              <img v-if="userData?.avatarUrl" :src="userData.avatarUrl" alt="Avatar" class="avatar-img" />
+            <div class="avatar-container" @click="triggerAvatarFileInput" title="alterar foto">
+              <img v-if="userData?.avatarUrl" :src="userData.avatarUrl" alt="avatar" class="avatar-img" />
               <div v-else class="avatar-initials">{{ userInitials }}</div>
               
               <div class="avatar-overlay">
@@ -188,7 +240,7 @@ const userInitials = computed(() => {
             
             <div class="user-info">
               <span class="user-name">{{ userData?.name }}</span>
-              <small class="logout-link" @click="handleLogout">Sair</small>
+              <small class="logout-link" @click="handleLogout">sair</small>
             </div>
             
             <input ref="avatarFileInput" type="file" accept="image/*" class="hidden-input" @change="onAvatarFileChange" />
@@ -201,7 +253,7 @@ const userInitials = computed(() => {
       
       <div v-if="isLoading" class="state-container">
         <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="4" />
-        <p>Carregando seus murais...</p>
+        <p>carregando seus murais...</p>
       </div>
 
       <div v-else-if="error" class="error-banner">
@@ -211,13 +263,14 @@ const userInitials = computed(() => {
 
       <div v-else-if="walls.length > 0">
         <div class="section-header">
-          <h2>Seus Murais</h2>
+          <h2>seus murais</h2>
           <span class="count">{{ walls.length }} murais criados</span>
         </div>
 
         <div class="walls-grid">
           <div v-for="wall in walls" :key="wall.id" class="wall-card-wrapper">
             <div class="wall-card" @click="openWall(wall.id)">
+              
               <div class="card-header-visual">
                 <div class="visual-icon"><i class="pi pi-map"></i></div>
               </div>
@@ -226,18 +279,18 @@ const userInitials = computed(() => {
                 <h3 class="wall-title" :title="wall.title">{{ wall.title }}</h3>
                 <p class="wall-date">
                   <i class="pi pi-calendar"></i> 
-                  {{ new Date(wall.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) }}
+                  {{ new Date(wall.createdAt).toLocaleDateString('pt-br', { day: '2-digit', month: 'short', year: 'numeric' }) }}
                 </p>
               </div>
 
               <div class="card-footer" @click.stop>
                 <div class="left-actions">
-                  <Button icon="pi pi-pencil" text rounded size="small" @click="openEditWallDialog(wall)" v-tooltip="'Renomear'" />
-                  <Button icon="pi pi-link" text rounded size="small" @click="copyShareLink(wall.id)" v-tooltip="'Copiar Link'" />
+                  <Button icon="pi pi-pencil" text rounded size="small" @click="openEditWallDialog(wall)" v-tooltip="'renomear'" />
+                  <Button icon="pi pi-link" text rounded size="small" @click="copyShareLink(wall.id)" v-tooltip="'copiar link'" />
                 </div>
                 <div class="right-actions">
-                  <Button icon="pi pi-external-link" text rounded size="small" @click="openPublicView(wall.id)" v-tooltip="'Ver Público'" />
-                  <Button icon="pi pi-trash" text rounded severity="danger" size="small" @click="handleDeleteWall(wall.id)" v-tooltip="'Excluir'" />
+                  <Button icon="pi pi-external-link" text rounded size="small" @click="openPublicView(wall.id)" v-tooltip="'ver publico'" />
+                  <Button icon="pi pi-trash" text rounded severity="danger" size="small" @click="handleDeleteWall(wall.id)" v-tooltip="'excluir'" />
                 </div>
               </div>
             </div>
@@ -249,9 +302,9 @@ const userInitials = computed(() => {
         <div class="empty-icon">
           <i class="pi pi-folder-open"></i>
         </div>
-        <h2>Nenhum mural por aqui</h2>
-        <p>Comece a organizar suas ideias criando seu primeiro mural.</p>
-        <Button label="Criar meu primeiro mural" icon="pi pi-plus" size="large" @click="isDialogVisible = true" />
+        <h2>nenhum mural por aqui</h2>
+        <p>comece a organizar suas ideias criando seu primeiro mural.</p>
+        <Button label="criar meu primeiro mural" icon="pi pi-plus" size="large" @click="isDialogVisible = true" />
       </div>
     </main>
 
@@ -259,12 +312,12 @@ const userInitials = computed(() => {
         <div class="dialog-content">
             <span class="p-float-label mt-4">
                 <InputText id="wall-title" v-model="newWallTitle" class="w-full" @keyup.enter="handleCreateWall" autofocus />
-                <label for="wall-title">Dê um nome ao mural</label>
+                <label for="wall-title">de um nome ao mural</label>
             </span>
         </div>
         <template #footer>
-            <Button label="Cancelar" text severity="secondary" @click="isDialogVisible = false" />
-            <Button label="Criar Mural" @click="handleCreateWall" />
+            <Button label="cancelar" text severity="secondary" @click="isDialogVisible = false" />
+            <Button label="criar mural" @click="handleCreateWall" />
         </template>
     </Dialog>
 
@@ -272,185 +325,114 @@ const userInitials = computed(() => {
       <div class="dialog-content">
         <span class="p-float-label mt-4">
           <InputText id="edit-wall-title" v-model="editingWallTitle" class="w-full" @keyup.enter="handleUpdateWall" autofocus />
-          <label for="edit-wall-title">Novo nome</label>
+          <label for="edit-wall-title">novo nome</label>
         </span>
       </div>
       <template #footer>
-        <Button label="Cancelar" text severity="secondary" @click="isEditTitleDialogVisible = false" />
-        <Button label="Salvar" @click="handleUpdateWall" />
+        <Button label="cancelar" text severity="secondary" @click="isEditTitleDialogVisible = false" />
+        <Button label="salvar" @click="handleUpdateWall" />
       </template>
     </Dialog>
   </div>
 </template>
 
 <style scoped>
-/* Reset & Layout */
+/* reset e layout */
 .app-wrapper {
-  background-color: #f8fafc; /* Slate-50 */
+  background-color: #f8fafc; /* slate-50 */
   min-height: 100vh;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #334155;
 }
 
-/* Navbar Style */
+/* estilo da barra de navegacao */
 .navbar {
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
   padding: 0.75rem 0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  position: sticky; top: 0; z-index: 100;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .navbar-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1.5rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  max-width: 1200px; margin: 0 auto; padding: 0 1.5rem;
+  display: flex; justify-content: space-between; align-items: center;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+.brand { display: flex; align-items: center; gap: 10px; }
 
 .logo-icon {
-  width: 36px;
-  height: 36px;
+  width: 36px; height: 36px;
   background: linear-gradient(135deg, #4f46e5, #6366f1);
-  color: white;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 1.2rem;
+  color: white; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 1.2rem;
 }
 
 .brand-text h1 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0;
-  line-height: 1;
+  font-size: 1.25rem; font-weight: 700; color: #1e293b;
+  margin: 0; line-height: 1;
 }
 
-.navbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-}
+.navbar-actions { display: flex; align-items: center; gap: 1.5rem; }
 
-.create-btn {
-  background-color: #4f46e5;
-  border: none;
-}
-.create-btn:hover {
-  background-color: #4338ca;
-}
+.create-btn { background-color: #4f46e5; border: none; }
+.create-btn:hover { background-color: #4338ca; }
 
-/* Perfil Moderno */
+/* perfil de usuario */
 .user-profile {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-left: 1.5rem;
-  border-left: 1px solid #e2e8f0;
+  display: flex; align-items: center; gap: 10px;
+  padding-left: 1.5rem; border-left: 1px solid #e2e8f0;
 }
 
 .avatar-container {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  cursor: pointer;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 2px solid #e2e8f0;
+  position: relative; width: 40px; height: 40px; cursor: pointer;
+  border-radius: 50%; overflow: hidden; border: 2px solid #e2e8f0;
   transition: border-color 0.2s;
 }
-.avatar-container:hover {
-  border-color: #6366f1;
-}
+.avatar-container:hover { border-color: #6366f1; }
 
-.avatar-img {
-  width: 100%; height: 100%; object-fit: cover;
-}
+.avatar-img { width: 100%; height: 100%; object-fit: cover; }
 
 .avatar-initials {
-  width: 100%; height: 100%;
-  background: #f1f5f9;
-  color: #475569;
+  width: 100%; height: 100%; background: #f1f5f9; color: #475569;
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 0.9rem;
 }
 
 .avatar-overlay {
-  position: absolute; inset: 0;
-  background: rgba(0,0,0,0.4);
+  position: absolute; inset: 0; background: rgba(0,0,0,0.4);
   display: flex; align-items: center; justify-content: center;
   opacity: 0; transition: opacity 0.2s;
 }
 .avatar-container:hover .avatar-overlay { opacity: 1; }
 .avatar-overlay i { color: white; font-size: 0.8rem; }
 
-.user-info {
-  display: flex; flex-direction: column;
-}
-
-.user-name {
-  font-weight: 600; font-size: 0.9rem; color: #1e293b;
-}
-
-.logout-link {
-  font-size: 0.75rem; color: #64748b; cursor: pointer;
-  transition: color 0.2s;
-}
+.user-info { display: flex; flex-direction: column; }
+.user-name { font-weight: 600; font-size: 0.9rem; color: #1e293b; }
+.logout-link { font-size: 0.75rem; color: #64748b; cursor: pointer; transition: color 0.2s; }
 .logout-link:hover { color: #ef4444; text-decoration: underline; }
 .hidden-input { display: none; }
 
+/* conteudo principal */
+.main-content { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; }
 
-/* Main Content */
-.main-content {
-  max-width: 1200px;
-  margin: 2rem auto;
-  padding: 0 1.5rem;
-}
+.section-header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.5rem; }
+.section-header h2 { font-size: 1.5rem; color: #1e293b; margin: 0; }
+.section-header .count { font-size: 0.9rem; color: #64748b; }
 
-.section-header {
-  display: flex;
-  align-items: baseline;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-.section-header h2 {
-  font-size: 1.5rem; color: #1e293b; margin: 0;
-}
-.section-header .count {
-  font-size: 0.9rem; color: #64748b;
-}
-
-/* Cards Grid */
+/* grid de cards */
 .walls-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.5rem;
 }
 
 .wall-card {
-  background: white;
-  border-radius: 12px;
+  background: white; border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  border: 1px solid #e2e8f0;
-  overflow: hidden;
-  transition: all 0.2s ease;
-  display: flex;
-  flex-direction: column;
-  height: 200px;
-  cursor: pointer;
+  border: 1px solid #e2e8f0; overflow: hidden;
+  transition: all 0.2s ease; display: flex; flex-direction: column;
+  height: 200px; cursor: pointer;
 }
 
 .wall-card:hover {
@@ -460,82 +442,42 @@ const userInitials = computed(() => {
 }
 
 .card-header-visual {
-  height: 48px;
-  background: linear-gradient(to right, #e0e7ff, #f3f4f6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 48px; background: linear-gradient(to right, #e0e7ff, #f3f4f6);
+  display: flex; align-items: center; justify-content: center;
   border-bottom: 1px solid #f1f5f9;
 }
-.visual-icon {
-  color: #818cf8;
-  font-size: 1.2rem;
-}
+.visual-icon { color: #818cf8; font-size: 1.2rem; }
 
-.card-body {
-  padding: 1rem;
-  flex: 1;
-}
+.card-body { padding: 1rem; flex: 1; }
 
 .wall-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0 0 0.5rem 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 1.1rem; font-weight: 600; color: #1e293b;
+  margin: 0 0 0.5rem 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .wall-date {
-  font-size: 0.8rem;
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
+  font-size: 0.8rem; color: #94a3b8;
+  display: flex; align-items: center; gap: 6px; margin: 0;
 }
 
 .card-footer {
-  padding: 0.5rem 0.75rem;
-  border-top: 1px solid #f1f5f9;
-  background: #fafafa;
-  display: flex;
-  justify-content: space-between;
+  padding: 0.5rem 0.75rem; border-top: 1px solid #f1f5f9;
+  background: #fafafa; display: flex; justify-content: space-between;
 }
 
-.left-actions, .right-actions {
-  display: flex; gap: 0.25rem;
-}
+.left-actions, .right-actions { display: flex; gap: 0.25rem; }
 
-/* Empty & Loading States */
-.state-container, .empty-state {
-  text-align: center;
-  padding: 4rem 1rem;
-}
+/* estados de carregamento e vazio */
+.state-container, .empty-state { text-align: center; padding: 4rem 1rem; }
 
-.empty-state {
-  background: white;
-  border-radius: 16px;
-  border: 1px dashed #cbd5e1;
-}
-
-.empty-icon {
-  font-size: 3rem;
-  color: #cbd5e1;
-  margin-bottom: 1rem;
-}
+.empty-state { background: white; border-radius: 16px; border: 1px dashed #cbd5e1; }
+.empty-icon { font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem; }
 .empty-state h2 { color: #1e293b; margin-bottom: 0.5rem; }
 .empty-state p { color: #64748b; margin-bottom: 1.5rem; }
 
 .error-banner {
-  background: #fee2e2;
-  color: #b91c1c;
-  padding: 1rem;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  background: #fee2e2; color: #b91c1c; padding: 1rem;
+  border-radius: 8px; display: flex; align-items: center; gap: 10px;
   margin-bottom: 2rem;
 }
 

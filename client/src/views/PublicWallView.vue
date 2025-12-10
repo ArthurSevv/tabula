@@ -1,26 +1,43 @@
 <script setup>
+// imports de bibliotecas
 import { ref, onMounted, markRaw, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { VueFlow } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
+
+// componentes
 import ImageNode from '@/components/ImageNode.vue';
-import { getPublicWall } from '@/services/api';
 import Button from 'primevue/button';
+
+// api
+import { getPublicWall } from '@/services/api';
 
 const route = useRoute();
 const router = useRouter();
+
+// registro de componentes do fluxo
 const nodeTypes = { imageNode: markRaw(ImageNode) };
+
+// ---------------------------------------------------------
+// estado (state)
+// ---------------------------------------------------------
 
 const elements = ref([]);
 const isLoading = ref(true);
 const error = ref(null);
-const wallData = ref(null); // Armazena dados completos do mural para o fundo
+const wallData = ref(null); // armazena dados completos para o fundo
+
+// ---------------------------------------------------------
+// ciclo de vida
+// ---------------------------------------------------------
 
 onMounted(async () => {
   try {
+    // busca dados publicos do mural via api
     const data = await getPublicWall(route.params.id);
     wallData.value = data;
 
+    // mapeia notas para nos
     const nodes = data.notes.map((note, index) => {
       const hasSavedPosition = note.positionX !== null && note.positionY !== null;
       return {
@@ -29,36 +46,42 @@ onMounted(async () => {
         position: hasSavedPosition
           ? { x: note.positionX, y: note.positionY }
           : { x: (index * 250) % 1000, y: Math.floor(index / 4) * 120 },
-        // IMPORTANTE: Mapear todos os dados novos (cor, mediaUrl, autor)
+        
+        // mapeia dados visuais e trava edicao
         data: {
           label: note.textContent || '',
           mediaUrl: note.mediaUrl || note.imageUrl || null,
           noteColor: note.color || '#ffffff',
-          authorName: note.author?.name || 'Anônimo',
+          authorName: note.author?.name || 'anonimo',
           authorAvatar: note.author?.avatarUrl || null,
-          isEditable: false, // Força false para visualização pública
+          isEditable: false, // forca false para visualizacao publica
           isOwnerNote: false 
         }
       };
     });
 
+    // mapeia arestas (conexoes)
     const edges = data.edges.map(edge => ({
       id: `e${edge.sourceId}-${edge.targetId}`,
       source: edge.sourceId.toString(),
       target: edge.targetId.toString(),
-      animated: true, // Estilo visual para conexões
+      animated: true, // estilo visual para conexoes
     }));
 
     elements.value = [...nodes, ...edges];
   } catch (err) {
-    console.error('Erro ao carregar mural público:', err);
-    error.value = 'Mural não encontrado ou acesso restrito.';
+    console.error('erro ao carregar mural publico:', err);
+    error.value = 'mural nao encontrado ou acesso restrito.';
   } finally {
     isLoading.value = false;
   }
 });
 
-// Estilo dinâmico do fundo
+// ---------------------------------------------------------
+// funcoes auxiliares
+// ---------------------------------------------------------
+
+// estilo dinamico do fundo
 const wallStyle = computed(() => {
     if (!wallData.value) return {};
     return {
@@ -80,7 +103,7 @@ function goToLogin() {
     
     <div v-if="isLoading" class="center-state">
         <i class="pi pi-spin pi-spinner" style="font-size: 2rem; color: #4f46e5;"></i>
-        <p>Carregando mural...</p>
+        <p>carregando mural...</p>
     </div>
 
     <div v-else-if="error" class="center-state">
@@ -97,12 +120,12 @@ function goToLogin() {
                     <div class="logo-icon">T</div>
                     <div class="titles">
                         <h1>{{ wallData?.title }}</h1>
-                        <span class="badge">Visualização Pública</span>
+                        <span class="badge">visualização pública</span>
                     </div>
                 </div>
 
                 <div class="actions">
-                    <span class="cta-text">Gostou? Crie o seu!</span>
+                    <span class="cta-text">gostou? crie o seu!</span>
                     <Button label="Entrar no Tabula" size="small" @click="goToLogin" />
                 </div>
             </div>
@@ -123,7 +146,7 @@ function goToLogin() {
         </VueFlow>
 
         <div class="read-only-footer">
-            <i class="pi pi-eye"></i> Você está em modo somente leitura.
+            <i class="pi pi-eye"></i> você está em modo somente leitura.
         </div>
     </div>
   </div>
@@ -138,6 +161,7 @@ function goToLogin() {
   font-family: 'Inter', sans-serif;
 }
 
+/* estados de centro (loading/error) */
 .center-state {
     height: 100vh;
     display: flex;
@@ -155,7 +179,7 @@ function goToLogin() {
     transition: background 0.3s ease;
 }
 
-/* Header Flutuante Estilo "Glassmorphism" */
+/* header flutuante estilo "glassmorphism" */
 .public-header {
     position: absolute;
     top: 20px;
@@ -222,14 +246,14 @@ function goToLogin() {
 .cta-text {
     font-size: 0.85rem;
     color: #64748b;
-    display: none; /* Esconde em mobile */
+    display: none; /* esconde em mobile */
 }
 
 @media (min-width: 768px) {
     .cta-text { display: block; }
 }
 
-/* Footer Fixo */
+/* footer fixo */
 .read-only-footer {
     position: absolute;
     bottom: 20px;
@@ -244,7 +268,7 @@ function goToLogin() {
     align-items: center;
     gap: 8px;
     z-index: 1000;
-    pointer-events: none; /* Permite clicar através dele se necessário */
+    pointer-events: none; /* permite clicar atraves dele se necessario */
     backdrop-filter: blur(4px);
 }
 

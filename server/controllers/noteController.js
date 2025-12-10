@@ -1,22 +1,25 @@
 import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
 import { getIo } from '../utils/io.js';
 
+const prisma = new PrismaClient();
+
+// cria uma nova nota no mural
 export async function createNote(req, res) {
     const { wallId, textContent, positionX, positionY, color } = req.body; 
     const authorId = req.user.id;
-    // Pega o token de todos os lugares possiveis
+    
+    // recupera o token de compartilhamento (header, query ou body)
     const shareLink = req.body.shareLink || req.query.shareLink || req.headers['x-share-token'];
 
     try {
         const wall = await prisma.wall.findUnique({ where: { id: parseInt(wallId) } });
-        if (!wall) return res.status(404).json({ message: "Mural nao encontrado."});
+        if (!wall) return res.status(404).json({ message: "mural nao encontrado."});
         
-        // PERMISSAO: Dono OU (Usuario logado E Token Valido)
+        // permissao: dono do mural ou usuario com token valido
         const canEdit = (wall.ownerId === authorId) || (shareLink && wall.shareLink && shareLink === wall.shareLink);
         
         if (!canEdit) {
-            return res.status(403).json({ message: "Acesso negado."});
+            return res.status(403).json({ message: "acesso negado."});
         }
 
         const newNote = await prisma.note.create({
@@ -32,9 +35,11 @@ export async function createNote(req, res) {
             }
         });
 
+        // anexa dados do autor para retorno
         const author = await prisma.user.findUnique({ where: { id: authorId }, select: { id: true, name: true, avatarUrl: true } });
         const noteWithAuthor = { ...newNote, author };
 
+        // notifica via socket
         const io = getIo();
         if (io) {
             io.to(`wall:${wallId}`).emit('noteCreated', noteWithAuthor);
@@ -42,10 +47,11 @@ export async function createNote(req, res) {
 
         res.status(201).json(noteWithAuthor);
     } catch (error) {
-        res.status(500).json({ message: "Erro ao criar a nota." });
+        res.status(500).json({ message: "erro ao criar a nota." });
     }
-}1
+}
 
+// atualiza conteudo ou cor da nota
 export async function updateNote(req, res){
     const { id } = req.params;
     const { textContent, mediaUrl, color } = req.body;
@@ -54,20 +60,20 @@ export async function updateNote(req, res){
     try {
         const noteId = parseInt(id);
         const note = await prisma.note.findUnique({ where: { id: noteId } });
-        if (!note) return res.status(404).json({ message: "Nota nao encontrada." });
+        if (!note) return res.status(404).json({ message: "nota nao encontrada." });
 
         const wall = await prisma.wall.findUnique({ where: { id: note.wallId } });
         
-        // Pega token do header ou body (se o front mandar)
+        // pega token do header ou body
         const shareLink = req.body.shareLink || req.headers['x-share-token'];
 
-        // PERMISSAO: Autor da nota OU Dono do mural OU (Usuario logado E Token Valido)
+        // permissao: autor da nota ou dono do mural ou usuario com token valido
         const isAuthor = note.authorId === userId;
         const isWallOwner = wall && wall.ownerId === userId;
         const hasValidToken = (shareLink && wall.shareLink === shareLink);
 
         if (!isAuthor && !isWallOwner && !hasValidToken) {
-            return res.status(403).json({ message: "Acesso negado."});
+            return res.status(403).json({ message: "acesso negado."});
         }
 
         const updatedNote = await prisma.note.update({
@@ -83,17 +89,18 @@ export async function updateNote(req, res){
 
         return res.status(200).json(updatedWithAuthor);
     } catch (error) {
-        return res.status(500).json({ message: "Erro ao atualizar a nota." });
+        return res.status(500).json({ message: "erro ao atualizar a nota." });
     }
 }
 
+// atualiza posicao da nota (arrastar)
 export async function updateNotePosition(req, res) {
     const { id } = req.params;
     const { position } = req.body;
     const userId = req.user.id;
 
     if (!position || typeof position.x !== 'number' || typeof position.y !== 'number') {
-        return res.status(400).json({ message: "Dados de posição inválidos ou ausentes." }); 
+        return res.status(400).json({ message: "dados de posicao invalidos." }); 
     }
 
     try {
@@ -103,14 +110,17 @@ export async function updateNotePosition(req, res) {
             include: { wall: true }
         });
 
-        if (!note) return res.status(404).json({ message: "Nota não encontrada." });
+        if (!note) return res.status(404).json({ message: "nota nao encontrada." });
 
-        // allow moving if wall owner or share token provided in body/header/query
         const shareLink = req.body.shareLink || req.query.shareLink || req.headers['x-share-token'];
-        const canMove = (note.wall.ownerId === userId || (shareLink && note.wall.shareLink === shareLink));
         
-        if (!canMove) {
-            return res.status(403).json({ message: "Acesso negado." });
+        // permissao: dono, autor ou token valido
+        const isAuthor = note.authorId === userId;
+        const isWallOwner = note.wall.ownerId === userId;
+        const hasValidToken = (shareLink && note.wall.shareLink === shareLink);
+
+        if (!isAuthor && !isWallOwner && !hasValidToken) {
+            return res.status(403).json({ message: "acesso negado." });
         }
 
         const updatedNote = await prisma.note.update({
@@ -128,11 +138,12 @@ export async function updateNotePosition(req, res) {
 
         res.status(200).json(updatedNote);
     } catch (error) {
-        console.error("Erro atualizar posicao", error);
-        res.status(500).json({ message: "Erro ao atualizar a posição da nota." });
+        console.error("erro atualizar posicao", error);
+        res.status(500).json({ message: "erro ao atualizar a posicao da nota." });
     }
 }
 
+// deleta uma nota e suas conexoes
 export async function deleteNote(req, res) {
     const { id: noteId } = req.params;
     const userId = req.user.id;
@@ -143,20 +154,24 @@ export async function deleteNote(req, res) {
         });
 
         if (!note) {
-            return res.status(404).json({ message: "Nota não encontrada." });
+            return res.status(404).json({ message: "nota nao encontrada." });
         }
 
-        // Only the author or the wall owner can delete the note
         const wall = await prisma.wall.findUnique({ where: { id: note.wallId } });
+        const shareLink = req.headers['x-share-token'];
+
+        // permissao: autor, dono do mural ou token valido
         const isAuthor = note.authorId === userId;
         const isWallOwner = wall && wall.ownerId === userId;
-        if (!isAuthor && !isWallOwner) {
-            return res.status(403).json({ message: "Acesso negado. Você não tem permissão para deletar esta nota." });
+        const hasValidToken = (shareLink && wall.shareLink === shareLink);
+
+        if (!isAuthor && !isWallOwner && !hasValidToken) {
+            return res.status(403).json({ message: "acesso negado. voce nao tem permissao para deletar esta nota." });
         }
 
         const noteIdInt = parseInt(noteId);
         
-        // Transação para deletar arestas conectadas antes de deletar a nota
+        // transacao para deletar arestas conectadas antes de deletar a nota
         await prisma.$transaction([
             prisma.edge.deleteMany({
                 where: {
@@ -178,7 +193,7 @@ export async function deleteNote(req, res) {
 
         return res.status(204).send();
     } catch (error) {
-        console.error("ERRO AO DELETAR NOTA:", error);
-        return res.status(500).json({ message: "Erro ao deletar a nota." });
+        console.error("erro ao deletar nota:", error);
+        return res.status(500).json({ message: "erro ao deletar a nota." });
     }
 }

@@ -38,7 +38,7 @@ const isLoading = ref(true);
 const error = ref(null);
 const wallTitle = ref('');
 const wallOwnerId = ref(null);
-const isReadOnly = ref(false); // Logica alterada abaixo
+const isReadOnly = ref(false);
 
 // configuracoes de fundo (background)
 const wallBackgroundColor = ref('#f0f0f0');
@@ -79,29 +79,28 @@ onMounted(async () => {
         const userData = JSON.parse(localStorage.getItem('userData'));
         const isLoggedIn = !!userData;
 
-        // Recupera token da URL
+        // recupera token da url se houver e salva
         const shareTokenFromQuery = route.query.token || null;
         if (shareTokenFromQuery) {
             localStorage.setItem('shareToken', shareTokenFromQuery);
         }
         const shareToken = localStorage.getItem('shareToken') || null;
 
-        // LÓGICA DE PERMISSÃO CORRIGIDA:
-        // 1. Se NÃO está logado, é ReadOnly (independente do token)
-        // 2. Se ESTÁ logado, tentamos acesso total (Back-end valida se o token permite edição)
+        // logica de permissao:
+        // se nao ta logado, e readonly. se ta logado, tenta acesso total.
         if (!isLoggedIn) {
             isReadOnly.value = true;
         } else {
             isReadOnly.value = false;
         }
 
-        // Se for ReadOnly (deslogado), usa rota pública. Se logado, usa rota normal (protegida)
-        // O backend vai decidir se deixa editar ou não baseado no token
+        // busca dados do mural
+        // importante: passa o sharetoken mesmo se estiver logado, para validar acesso caso nao seja dono
         const wallData = isReadOnly.value 
             ? await getPublicWall(route.params.id) 
             : await getWallById(route.params.id, shareToken);
         
-        // Configura dados do mural
+        // configura dados do mural
         wallTitle.value = wallData.title || '';
         wallOwnerId.value = wallData.ownerId || null;
         
@@ -110,16 +109,15 @@ onMounted(async () => {
 
         const currentUserId = userData ? userData.id : null;
 
-        // Mapeia notas
+        // mapeia notas do banco para o vueflow
         const nodes = wallData.notes.map((note, index) => {
             const hasSavedPosition = note.positionX !== null && note.positionY !== null;
             
-            // Verifica se pode editar essa nota específica
-            // (Dono do mural, Autor da nota, ou Usuário Logado com Token Válido)
+            // verifica permissao de edicao da nota especifica
             const canEditNote = isLoggedIn && (
                 currentUserId === note.authorId || 
                 currentUserId === wallData.ownerId || 
-                shareToken // Se tem token e tá logado, assumimos permissão (backend valida no save)
+                shareToken 
             );
 
             return {
@@ -151,13 +149,12 @@ onMounted(async () => {
 
     } catch (err) {
         console.error("erro ao carregar mural:", err);
-        // Se der erro 403/401 ao tentar carregar como logado, tenta fallback para público
+        // fallback: se falhar o carregamento autenticado (403), tenta mostrar erro amigavel
         if (!isReadOnly.value) {
             isReadOnly.value = true;
-            // Recarrega página ou tenta getPublicWall aqui (simplificado para recarregar)
-            error.value = "Você não tem permissão de edição ou o mural não existe.";
+            error.value = "voce nao tem permissao ou o mural nao existe.";
         } else {
-            error.value = "Erro ao carregar dados do mural";
+            error.value = "erro ao carregar dados do mural";
         }
     } finally {
         isLoading.value = false;
@@ -183,7 +180,7 @@ function setupSocket() {
         const userData = JSON.parse(localStorage.getItem('userData'));
         const token = userData ? userData.token : null;
         
-        // Se não tem token, não conecta no socket de edição
+        // so conecta no socket se tiver token de usuario
         if (!token) return;
 
         const socket = io('http://localhost:3000', { auth: { token } });
@@ -192,33 +189,28 @@ function setupSocket() {
         const shareToken = localStorage.getItem('shareToken') || null;
         socket.emit('join-wall', { wallId: route.params.id, shareLink: shareToken });
 
-        // --- CORREÇÃO DA LISTA DE PRESENÇA ---
+        // logica de presenca corrigida
+        // mostra todo mundo (incluindo eu), mas remove duplicatas de abas
         socket.on('presence', (users) => { 
             if (!users || !Array.isArray(users)) {
                 presenceUsers.value = [];
                 return;
             }
 
-            // Lógica: Mostrar todo mundo (incluindo eu), mas sem repetição.
-            // Se eu estiver com 3 abas abertas, mostro meu avatar apenas 1 vez.
-
             const uniqueUsers = [];
             const seenIds = new Set();
 
             users.forEach(u => {
-                // Verifica se tem ID e se já não adicionamos esse ID na lista
                 if (u.id && !seenIds.has(u.id)) {
                     seenIds.add(u.id);
                     uniqueUsers.push(u);
                 }
             });
 
-            // Atualiza a lista na tela
             presenceUsers.value = uniqueUsers;
         });
 
-        // --- RESTO DOS EVENTOS (NÃO MUDOU NADA ABAIXO) ---
-
+        // eventos de notas e mural
         socket.on('noteCreated', (note) => {
             if (elements.value.some(el => el.id.toString() === note.id.toString())) return;
             
@@ -237,7 +229,6 @@ function setupSocket() {
                     authorName: note.author?.name,
                     authorAvatar: note.author?.avatarUrl,
                     authorId: note.authorId,
-                    // Permite editar se for dono da nota, dono do mural ou tiver token de compartilhamento
                     isEditable: currentUserId && (currentUserId === note.authorId || currentUserId === wallOwnerId.value || localStorage.getItem('shareToken')),
                     isOwnerNote: currentUserId === note.authorId,
                 }
@@ -286,7 +277,7 @@ function setupSocket() {
 }
 
 // ---------------------------------------------------------
-// acoes e funcoes (mantidas iguais, apenas background)
+// funcoes do mural (fundo, conexoes)
 // ---------------------------------------------------------
 
 const wallStyle = computed(() => ({
@@ -323,6 +314,10 @@ const handleConnect = (params) => {
     createEdge({ sourceId: params.source, targetId: params.target, wallId })
         .catch(err => console.error("erro ao ligar notas:", err));
 };
+
+// ---------------------------------------------------------
+// funcoes de nota (criar, editar, mover)
+// ---------------------------------------------------------
 
 function openEditDialog({ node }) {
     if (isReadOnly.value) return;
@@ -384,7 +379,10 @@ function onNodeDragStop(event) {
     }
 }
 
-// Context Menu
+// ---------------------------------------------------------
+// menu de contexto (clique direito)
+// ---------------------------------------------------------
+
 const onDocClick = (e) => {
     const menuEl = document.querySelector('.context-menu');
     if (menuEl && !menuEl.contains(e.target)) contextMenuVisible.value = false;
@@ -520,14 +518,15 @@ async function handleContextAddNote() {
 </template>
 
 <style>
-/* CSS ATUALIZADO PARA OS AVATARES E HEADER */
+/* importacao estilos do vueflow */
 @import '@vue-flow/core/dist/style.css';
 @import '@vue-flow/core/dist/theme-default.css';
 
+/* layout principal */
 .map-container { height: 100vh; width: 100%; position: relative; overflow: hidden; background: #f8fafc; font-family: 'Inter', sans-serif; }
 .vf-wrapper { width: 100%; height: 100vh; transition: background 0.3s ease; }
 
-/* HEADER FLUTUANTE */
+/* cabecalho flutuante */
 .map-header {
     position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 1100;
     display: flex; justify-content: space-between; align-items: center;
@@ -536,7 +535,7 @@ async function handleContextAddNote() {
     background: rgba(255,255,255,0.85);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255,255,255,0.6);
-    border-radius: 99px; /* Formato pilula */
+    border-radius: 99px; 
     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
 .header-left { display: flex; align-items: center; gap: 12px; }
@@ -544,26 +543,26 @@ async function handleContextAddNote() {
 .map-title { font-weight: 700; font-size: 1rem; color: #1e293b; }
 .public-badge { background: #f1f5f9; color: #64748b; padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; text-transform:uppercase; border: 1px solid #e2e8f0; }
 
-/* LISTA DE PRESENÇA ESTILO "STACK" */
+/* avatares empilhados */
 .header-right { display: flex; align-items: center; gap: 12px; }
 .presence-list { 
     display:flex; 
     align-items: center; 
     margin-right: 10px; 
-    padding-left: 10px; /* espaco para o overlap */
+    padding-left: 10px; 
 }
 
 .presence-item {
-    margin-left: -12px; /* Faz o overlap (um cima do outro) */
+    margin-left: -12px; /* efeito de sobreposicao */
     transition: transform 0.2s, margin 0.2s;
     position: relative;
-    cursor: help; /* Indica que tem tooltip */
+    cursor: help;
 }
 
 .presence-item:hover {
-    transform: translateY(-4px); /* Sobe ao passar mouse */
-    z-index: 200 !important; /* Fica por cima de todos */
-    margin-right: 4px; /* Abre espaco */
+    transform: translateY(-4px); 
+    z-index: 200 !important; 
+    margin-right: 4px;
 }
 
 .presence-avatar { 
@@ -579,12 +578,13 @@ async function handleContextAddNote() {
 .btn-settings { color: #64748b !important; }
 .btn-settings:hover { background: rgba(0,0,0,0.05) !important; color: #1e293b !important; }
 
-/* RESTO DO CSS (Formularios, Botoes) */
+/* botoes flutuantes */
 .controls-custom { position: fixed; bottom: 30px; right: 30px; z-index: 1200; }
 .fab-add { width: 56px !important; height: 56px !important; border-radius: 50% !important; background-color: #4f46e5 !important; border:none !important; box-shadow: 0 8px 20px rgba(79, 70, 229, 0.4); }
 .fab-add:hover { transform: scale(1.05); }
 .help-fab { position: fixed; bottom: 30px; left: 30px; z-index: 1200; }
 
+/* utilitarios visuais */
 .font-bold { font-weight: 600; color: #334155; }
 .block { display: block; }
 .mb-2 { margin-bottom: 0.5rem; } .mt-4 { margin-top: 1rem; } .w-full { width: 100%; }

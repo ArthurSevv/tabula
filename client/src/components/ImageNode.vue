@@ -1,17 +1,24 @@
 <script setup>
+// imports de bibliotecas
 import { Handle, Position } from '@vue-flow/core';
 import { computed } from 'vue';
 import { deleteNote } from '@/services/api';
 
+// definicao de propriedades (props)
 const props = defineProps({
   id: { type: String, required: true },
   data: { type: Object, required: true },
   selected: { type: Boolean, default: false },
 });
 
+// constante da api (ajuste se necessario para variavel de ambiente)
 const API_BASE_URL = 'http://localhost:3000';
 
-// --- LÓGICA DE DETECÇÃO DE MÍDIA (IGUAL ANTES) ---
+// ---------------------------------------------------------
+// logica de midia (youtube, imagem, video, pdf)
+// ---------------------------------------------------------
+
+// detecta id do youtube
 const youtubeId = computed(() => {
   const url = props.data?.mediaUrl || props.data?.imageUrl;
   if (!url) return null;
@@ -20,47 +27,62 @@ const youtubeId = computed(() => {
   return (match && match[2].length === 11) ? match[2] : null;
 });
 
+// resolve url completa para arquivos locais (uploads)
 const resolvedUrl = computed(() => {
   let url = props.data?.mediaUrl || props.data?.imageUrl;
   if (!url) return '';
+  
   if (url.startsWith('http')) return url;
+
   if (url.includes('uploads')) {
     const parts = url.split('uploads');
     url = 'uploads' + parts[parts.length - 1];
   } else {
     url = `uploads/${url}`;
   }
+  
+  // normaliza barras
   url = url.replace(/\\/g, '/').replace('uploads//', 'uploads/');
   return `${API_BASE_URL}/${url}`;
 });
 
+// verificacoes de tipo de arquivo
 const isPdf = computed(() => !youtubeId.value && /\.pdf(\?.*)?$/i.test(resolvedUrl.value));
 const isVideo = computed(() => !youtubeId.value && /\.(mp4|webm|ogg|mov|avi)(\?.*)?$/i.test(resolvedUrl.value));
 
+// ---------------------------------------------------------
+// utilitarios visuais
+// ---------------------------------------------------------
+
+// iniciais para avatar sem imagem
 function getInitials(name) {
   if (!name) return 'U';
   return name.split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase();
 }
 
-async function handleDeleteClick() {
-  const noteId = props.data?.noteId || props.data?.id || props.id;
-  if (!noteId) return;
-  if (!confirm('Deseja realmente deletar esta nota?')) return;
-  try {
-    await deleteNote(noteId);
-  } catch (err) {
-    console.error('Erro ao deletar nota:', err);
-    alert('Não foi possível deletar a nota.');
-  }
-}
-
-// --- NOVO: LÓGICA DE COR DA NOTA ---
-// Se não vier cor do banco, usa branco padrão
+// estilo dinamico da nota (cor de fundo)
 const nodeStyle = computed(() => {
   return {
     backgroundColor: props.data.noteColor || '#ffffff',
   };
 });
+
+// ---------------------------------------------------------
+// acoes
+// ---------------------------------------------------------
+
+async function handleDeleteClick() {
+  const noteId = props.data?.noteId || props.data?.id || props.id;
+  if (!noteId) return;
+  if (!confirm('deseja realmente deletar esta nota?')) return;
+  
+  try {
+    await deleteNote(noteId);
+  } catch (err) {
+    console.error('erro ao deletar nota:', err);
+    alert('nao foi possivel deletar a nota.');
+  }
+}
 </script>
 
 <template>
@@ -68,20 +90,28 @@ const nodeStyle = computed(() => {
     :class="['custom-node', { selected: props.selected }]"
     :style="nodeStyle" 
   >
-    
-    <Handle type="target" :position="Position.Top" />
-    <Handle type="source" :position="Position.Bottom" />
+    <Handle type="target" :position="Position.Top" class="handle-custom" />
+    <Handle type="source" :position="Position.Bottom" class="handle-custom" />
 
-    <div class="meta-row">
-      <div class="avatar" v-if="props.data.authorName">
-        <img v-if="props.data.authorAvatar" :src="props.data.authorAvatar" alt="avatar" @error.once="e => e.target.style.display='none'" />
-        <div v-else class="initials">{{ getInitials(props.data.authorName) }}</div>
+    <div class="node-header">
+      <div class="user-profile">
+        <div class="avatar">
+          <img v-if="props.data.authorAvatar" :src="props.data.authorAvatar" alt="avatar" @error.once="e => e.target.style.display='none'" />
+          <div v-else class="initials">{{ getInitials(props.data.authorName) }}</div>
+        </div>
+        
+        <div class="author-details">
+          <span class="author-name">{{ props.data.authorName || 'Anônimo' }}</span>
+          <span v-if="props.data.isOwnerNote" class="badge-me">você</span>
+        </div>
       </div>
-      <span class="top-author-name">{{ props.data.authorName }}</span> 
-      <div class="spacer"></div>
+      
+      <button v-if="props.data.isEditable" class="delete-icon" @click.stop="handleDeleteClick" title="deletar nota">
+        ✕
+      </button>
     </div>
 
-    <div class="media-container">
+    <div class="media-content">
       <template v-if="youtubeId">
         <div class="youtube-wrapper">
           <iframe :src="`https://www.youtube.com/embed/${youtubeId}`" title="YouTube" frameborder="0" allowfullscreen></iframe>
@@ -89,7 +119,9 @@ const nodeStyle = computed(() => {
       </template>
 
       <template v-else-if="resolvedUrl && isPdf">
-        <a :href="resolvedUrl" target="_blank" class="pdf-link">📄 Abrir PDF</a>
+        <a :href="resolvedUrl" target="_blank" class="pdf-link">
+          <span class="icon">📄</span> abrir documento pdf
+        </a>
       </template>
 
       <template v-else-if="resolvedUrl && isVideo">
@@ -97,74 +129,179 @@ const nodeStyle = computed(() => {
       </template>
 
       <template v-else-if="resolvedUrl">
-        <img :src="resolvedUrl" alt="Anexo" @error.once="e => e.target.style.display='none'" />
+        <img :src="resolvedUrl" alt="anexo" class="node-image" @error.once="e => e.target.style.display='none'" />
       </template>
     </div>
 
-    <div v-if="props.data.label" class="label-wrapper">
+    <div v-if="props.data.label" class="node-text">
       {{ props.data.label }}
-    </div>
-
-    <div class="footer-wrapper">
-      <div class="author-info">
-        <small>Criado por: <strong>{{ props.data.authorName }}</strong> 
-          <span v-if="props.data.isOwnerNote" class="me-badge">(Você)</span>
-        </small>
-      </div>
-      
-      <div class="node-actions">
-        <button v-if="props.data.isEditable" class="delete-btn" @click="handleDeleteClick" title="Deletar">🗑️</button>
-      </div>
     </div>
 
   </div>
 </template>
 
 <style scoped>
+/* container principal da nota */
 .custom-node {
-  border: 1px solid #ccc; /* Borda mais neutra para combinar com cores */
   border-radius: 12px;
-  background: white; /* Cor padrão */
-  padding: 12px;
-  min-width: 200px;
-  max-width: 360px;
-  text-align: center;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background: white;
+  padding: 0; /* padding controlado nos filhos */
+  min-width: 220px;
+  max-width: 320px;
+  width: auto;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(0,0,0,0.05);
+  overflow: hidden; /* garante que imagem nao saia da borda arredondada */
+  color: #1e293b; /* slate-800 */
 }
 
+/* efeito de selecao e hover */
 .custom-node:hover {
-  box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   transform: translateY(-2px);
 }
 
 .custom-node.selected {
-  border: 2px solid #2563eb; /* Azul forte quando selecionado */
+  outline: 2px solid #6366f1; /* indigo-500 */
+  outline-offset: 2px;
 }
 
-/* Mídia */
-.media-container { margin-bottom: 10px; width: 100%; display: flex; justify-content: center; flex-direction: column; }
-.media-container img, .node-video { width: 100%; height: auto; max-height: 200px; object-fit: contain; border-radius: 6px; }
-.youtube-wrapper { position: relative; padding-bottom: 56.25%; height: 0; border-radius: 6px; overflow: hidden; background: black; }
-.youtube-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+/* cabecalho */
+.node-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  background: rgba(255,255,255,0.4); /* levemente transparente */
+}
 
-/* Cabeçalho */
-.meta-row { display: flex; align-items: center; margin-bottom: 8px; gap: 8px; }
-.avatar { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; background: #ddd; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; border: 1px solid rgba(0,0,0,0.1); }
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* avatar */
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #475569;
+  border: 1px solid white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
-.top-author-name { font-size: 12px; font-weight: 600; color: #444; }
-.spacer { flex: 1; }
 
-/* Texto */
-.label-wrapper { font-size: 14px; margin-bottom: 10px; text-align: left; white-space: pre-wrap; word-break: break-word; line-height: 1.4; color: #1f2937; }
+.author-details {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
 
-/* Rodapé */
-.footer-wrapper { border-top: 1px solid rgba(0,0,0,0.1); padding-top: 8px; display: flex; justify-content: space-between; align-items: center; }
-.author-info small { color: #666; font-size: 11px; }
-.me-badge { background: #10b981; color: white; padding: 1px 5px; border-radius: 4px; font-size: 9px; margin-left: 4px; font-weight: bold; text-transform: uppercase; }
+.author-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
 
-/* Botões */
-.delete-btn { background: none; border: none; cursor: pointer; font-size: 14px; opacity: 0.6; transition: opacity 0.2s; }
-.delete-btn:hover { opacity: 1; transform: scale(1.1); }
-.pdf-link { display: block; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 6px; text-decoration: none; color: #333; font-size: 12px; font-weight: 600; }
+.badge-me {
+  font-size: 9px;
+  color: #6366f1; /* indigo */
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+/* botao de deletar */
+.delete-icon {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  line-height: 1;
+}
+.delete-icon:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+/* area de midia */
+.media-content {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  background: rgba(0,0,0,0.02);
+}
+
+.media-content img.node-image {
+  width: 100%;
+  height: auto;
+  max-height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
+.node-video {
+  width: 100%;
+  max-height: 200px;
+  background: black;
+}
+
+.youtube-wrapper {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%;
+  background: black;
+}
+.youtube-wrapper iframe {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+}
+
+.pdf-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  width: 100%;
+  text-decoration: none;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 500;
+  background: #f1f5f9;
+  border-top: 1px solid rgba(0,0,0,0.05);
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+.pdf-link:hover { background: #e2e8f0; }
+
+/* texto */
+.node-text {
+  padding: 12px;
+  font-size: 14px;
+  color: #1e293b;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* pontos de conexao */
+.handle-custom {
+  width: 10px;
+  height: 10px;
+  background: #6366f1;
+  border: 2px solid white;
+}
 </style>

@@ -4,30 +4,29 @@ const NOTES_API_URL = "http://localhost:3000/api/notes";
 const EDGES_API_URL = "http://localhost:3000/api/edges";
 const UPLOADS_API_URL = "http://localhost:3000/api/uploads";
 
-// --- FUNÇÕES AUXILIARES ---
+// ---------------------------------------------------------
+// funcoes auxiliares
+// ---------------------------------------------------------
 
 async function handleResponse(response) {
     const text = await response.text();
-    // Tenta fazer o parse apenas se tiver texto, para evitar erro em respostas vazias (204)
+    // tenta fazer o parse apenas se tiver texto, para evitar erro em respostas vazias (204)
     const data = text ? JSON.parse(text) : {};
     
     if(!response.ok) {
         if (response.status === 401) {
-            // Opcional: Auto-logout se o token for inválido
+            // opcional: auto-logout se o token for invalido
             // localStorage.removeItem('userData');
             // location.href = '/auth';
         }
-        const error = data.message || `Erro ${response.status}`;
+        const error = data.message || `erro ${response.status}`;
         throw new Error(error);
     }
     return data;
 }
 
-/**
- * Gera os headers de autenticação automaticamente.
- * Inclui o Token JWT (Bearer) e o Token de Compartilhamento (x-share-token)
- * @param {Object} extraHeaders - Headers adicionais (ex: Content-Type)
- */
+// gera os headers de autenticacao automaticamente
+// inclui o token jwt (bearer) e o token de compartilhamento (x-share-token)
 function getAuthHeaders(extraHeaders = {}) {
     const headers = { ...extraHeaders };
     const userData = JSON.parse(localStorage.getItem('userData'));
@@ -40,7 +39,9 @@ function getAuthHeaders(extraHeaders = {}) {
     return headers;
 }
 
-// --- USUÁRIOS (AUTH) ---
+// ---------------------------------------------------------
+// usuarios (auth)
+// ---------------------------------------------------------
 
 export async function register(userData) {
     const response = await fetch(`${API_URL}/register`, {
@@ -64,10 +65,12 @@ export async function login(credentials) {
     return handleResponse(response);
 }
 
-// --- MURAIS (WALLS) ---
+// ---------------------------------------------------------
+// murais (walls)
+// ---------------------------------------------------------
 
 export async function getUserWalls() {
-    // Usa getAuthHeaders para pegar o token automaticamente
+    // usa getAuthHeaders para pegar o token automaticamente
     const response = await fetch(WALLS_API_URL, {
         method: 'GET',
         headers: getAuthHeaders()
@@ -86,12 +89,11 @@ export async function createWall(wallData) {
 }
 
 export async function getWallById(id, shareToken = null) {
-  // Envia shareToken na Query string (URL) E nos Headers
+  // envia sharetoken na query string (url) e nos headers
   const query = shareToken ? `?shareLink=${shareToken}` : '';
   
   const response = await fetch(`${WALLS_API_URL}/${id}${query}`, {
     method: 'GET',
-    // Correção: Usa a função getAuthHeaders que definimos lá em cima
     headers: getAuthHeaders(), 
   });
   return handleResponse(response);
@@ -131,7 +133,9 @@ export async function updateWall(wallId, wallData) {
     return handleResponse(response);
 }
 
-// --- NOTAS (NOTES) ---
+// ---------------------------------------------------------
+// notas (notes)
+// ---------------------------------------------------------
 
 export async function createNote(noteData) {
     const response = await fetch(NOTES_API_URL, {
@@ -172,11 +176,13 @@ export async function deleteNote(noteId) {
         headers: getAuthHeaders()
     });
     
-    // Se chegou aqui sem erro do fetch, deu certo
+    // se chegou aqui sem erro do fetch, deu certo
     return true;
 }
 
-// --- ARESTAS / CONEXÕES (EDGES) ---
+// ---------------------------------------------------------
+// arestas / conexoes (edges)
+// ---------------------------------------------------------
 
 export async function createEdge(edgeData) {
     const response = await fetch(EDGES_API_URL, {
@@ -202,7 +208,9 @@ export async function deleteEdge(edgeData) {
     return true;
 }
 
-// --- PERFIL E UPLOAD ---
+// ---------------------------------------------------------
+// perfil e upload
+// ---------------------------------------------------------
 
 export async function updateUserAvatar(userId, avatarUrl) {
     const response = await fetch(`${API_URL}/${userId}/avatar`, {
@@ -217,9 +225,9 @@ export async function uploadFile(file) {
     const formData = new FormData();
     formData.append('file', file);
 
-    // IMPORTANTE: Para upload de arquivo com FormData, NÃO definimos 'Content-Type'.
-    // O navegador define automaticamente como 'multipart/form-data' com o boundary correto.
-    // Usamos getAuthHeaders SEM passar objeto extra, apenas para pegar o token.
+    // importante: para upload de arquivo com formdata, nao definimos 'content-type'.
+    // o navegador define automaticamente como 'multipart/form-data' com o boundary correto.
+    // usamos getAuthHeaders sem passar objeto extra, apenas para pegar o token.
     const headers = getAuthHeaders();
 
     const response = await fetch(UPLOADS_API_URL, {

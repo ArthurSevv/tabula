@@ -25,8 +25,8 @@ model Wall {
   id              Int      @id @default(autoincrement())
   title           String
   shareLink       String?
-  backgroundColor String?  @default("#f0f0f0") // Novo campo para cor de fundo
-  backgroundImage String?                      // Novo campo para imagem de fundo
+  backgroundColor String?  @default("#f0f0f0") 
+  backgroundImage String?  
   createdAt       DateTime @default(now())
   ownerId         Int
   owner           User     @relation(fields: [ownerId], references: [id])
@@ -39,7 +39,7 @@ model Note {
   type        NoteType @default(TEXT)
   textContent String?
   mediaUrl    String? 
-  color       String?  @default("#ffffff") // Novo campo para cor da nota
+  color       String?  @default("#ffffff")
   authorId    Int
   positionX   Float?
   positionY   Float?
